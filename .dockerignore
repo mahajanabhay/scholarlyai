@@ -1,0 +1,11 @@
+node_modules
+__pycache__
+*.pyc
+.env
+chroma_db
+data_backup
+.next
+tests
+*.test.jsx
+*.test.py
+nginx/certs/

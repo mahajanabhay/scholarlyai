@@ -1,0 +1,231 @@
+from fastapi import APIRouter, Depends, HTTPException, Form, Request
+import json
+from datetime import date
+from backend.auth import User, authenticate_user, get_email_from_user_id, get_user_by_email, get_user_id_from_email
+from backend.db import get_connection, release_connection
+from backend.core.jwt_auth import create_token, get_current_user
+from backend.core.limiter import limiter
+from backend.services.memory_service import get_streak, push_notification
+
+router = APIRouter()
+
+
+@router.post("/auth/login")
+@limiter.limit("10/minute")
+async def login(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...)
+):
+    """Login user — max 10 attempts per minute per IP"""
+    success, message, user = authenticate_user(email, password)
+
+    if not success:
+        raise HTTPException(status_code=401, detail=message)
+
+    user_id = get_user_id_from_email(email)
+    if not user_id:
+        raise HTTPException(status_code=500, detail="User ID lookup failed after successful auth")
+    token   = create_token(user_id, email)
+
+    # Re-engagement notification for users returning after 2+ days
+    try:
+        streak = get_streak(user_id)
+        last_active = streak.get("last_active")
+        if last_active:
+            days_away = (date.today() - date.fromisoformat(last_active)).days
+            if days_away >= 2:
+                push_notification(
+                    user_id,
+                    f"👋 Welcome back! You were away for {days_away} days — let's get back on track!",
+                    "re_engagement"
+                )
+    except Exception:
+        pass
+
+    return {
+        "status":        "authenticated",
+        "user_id":       user_id,
+        "token":         token,
+        "email":         user.email,
+        "name":          user.name,
+        "avatar":        user.avatar,
+        "bio":           user.bio,
+        "subject_focus": user.subject_focus,
+    }
+
+
+@router.post("/auth/register")
+@limiter.limit("5/minute")
+async def register(
+    request: Request,
+    email:    str = Form(...),
+    password: str = Form(...),
+    name:     str = Form(...),
+):
+    """Register user — max 5 attempts per minute per IP"""
+    from backend.auth import register_user
+    success, message = register_user(email, name, password)
+
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+
+    user_id = get_user_id_from_email(email)
+    if not user_id:
+        raise HTTPException(status_code=500, detail="User ID lookup failed after successful registration")
+    token   = create_token(user_id, email)
+
+    return {
+        "status":        "registered",
+        "user_id":       user_id,
+        "token":         token,
+        "email":         email,
+        "name":          name,
+        "avatar":        "🎓",
+        "bio":           "",
+        "subject_focus": [],
+    }
+
+
+@router.get("/auth/check/{user_id}")
+async def check_auth(
+    user_id:      str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Check if user_id is valid and get user details"""
+    email = get_email_from_user_id(user_id)
+
+    if not email:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user = get_user_by_email(email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "valid":   True,
+        "user_id": user_id,
+        "email":   email,
+        "name":    user.name,
+        "avatar":  user.avatar,
+        "bio":     user.bio,
+    }
+
+@router.post("/auth/refresh")
+async def refresh_token(current_user: dict = Depends(get_current_user)):
+    """Issue a fresh token using the existing valid token."""
+    new_token = create_token(current_user["user_id"], current_user["email"])
+    return {"token": new_token}
+
+@router.post("/auth/profile/{user_id}")
+async def update_profile(
+    user_id:       str,
+    current_user:  dict = Depends(get_current_user),
+    name:          str = Form(None),
+    avatar:        str = Form(None),
+    bio:           str = Form(None),
+    subject_focus: str = Form(None),
+):
+    """Update user profile details"""
+    if current_user["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Cannot modify another user's profile")
+    email = get_email_from_user_id(user_id)
+
+    if not email:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user = get_user_by_email(email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if name:
+        user.name = name
+    if avatar:
+        user.avatar = avatar
+    if bio:
+        user.bio = bio
+    if subject_focus:
+        # Normalise: frontend sends JSON string, in-memory may already be a list
+        if isinstance(subject_focus, str):
+            try:
+                subject_focus = json.loads(subject_focus)
+            except json.JSONDecodeError:
+                subject_focus = [subject_focus]  # treat bare string as single-item list
+        user.subject_focus = subject_focus if isinstance(subject_focus, list) else []
+
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE users SET name=%s, avatar=%s, bio=%s, subject_focus=%s WHERE email=%s
+        """, (user.name, user.avatar, user.bio, user.subject_focus, email))
+        conn.commit()
+    finally:
+        release_connection(conn)
+
+    # Evict the in-memory profile cache so the next GET /profile re-reads
+    # from PostgreSQL. Without this, memory_service._profiles[user_id] holds
+    # the pre-update values until the worker restarts.
+    from backend.services.memory_service import _profiles
+    _profiles.pop(user_id, None)
+
+    return {
+        "status": "updated",
+        "user": {
+            "name":          user.name,
+            "avatar":        user.avatar,
+            "bio":           user.bio,
+            "subject_focus": user.subject_focus,
+        },
+    }
+
+@router.get("/auth/verify-email")
+async def verify_email(token: str):
+    from backend.db import get_connection, release_connection
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, email FROM users WHERE verify_token = %s AND is_verified = FALSE",
+            (token,)
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=400, detail="Invalid or expired verification link.")
+        cur.execute(
+            "UPDATE users SET is_verified = TRUE, verify_token = NULL WHERE id = %s",
+            (row[0],)
+        )
+        conn.commit()
+        return {"status": "verified", "email": row[1]}
+    finally:
+        release_connection(conn)
+
+
+@router.post("/auth/resend-verification")
+async def resend_verification(email: str = Form(...)):
+    import secrets
+    from backend.email_service import send_verification_email
+    from backend.db import get_connection, release_connection
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, name, is_verified FROM users WHERE email = %s",
+            (email.lower().strip(),)
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Email not found.")
+        if row[2]:
+            raise HTTPException(status_code=400, detail="Email already verified.")
+        token = secrets.token_urlsafe(32)
+        cur.execute(
+            "UPDATE users SET verify_token = %s WHERE id = %s",
+            (token, row[0])
+        )
+        conn.commit()
+        send_verification_email(email, row[1], token)
+        return {"status": "verification email sent"}
+    finally:
+        release_connection(conn)
