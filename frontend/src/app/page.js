@@ -18,7 +18,7 @@ export default function HomePage() {
 
     // Redirect immediately if either credential is missing
     if (!uid || !token) {
-      router.push("/login");
+      router.push("/landing");
       return;
     }
 
