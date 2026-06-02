@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -18,6 +19,26 @@ async def lifespan(app: FastAPI):
     init_db()
     yield
     # (add any shutdown cleanup here if needed)
+    # Re-index shared knowledge base if Chroma is empty
+    try:
+        from backend.services.vector_service import get_or_create_collection
+        from backend.ingest import ingest_pdfs
+        import glob
+
+        UPLOAD_DIR     = os.getenv("KNOWLEDGE_UPLOAD_DIR", "./knowledge_uploads")
+        SHARED_SESSION = "shared"
+
+        collection = get_or_create_collection(SHARED_SESSION)
+        if collection.count() == 0:
+            pdfs = glob.glob(os.path.join(UPLOAD_DIR, "*.pdf"))
+            if pdfs:
+                print(f"🔄 Re-indexing {len(pdfs)} PDFs into shared knowledge base...")
+                ingest_pdfs(UPLOAD_DIR, SHARED_SESSION)
+                print("✅ Shared knowledge base re-indexed.")
+            else:
+                print("ℹ️  No PDFs found in knowledge_uploads — skipping re-index.")
+    except Exception as e:
+        print(f"⚠️  Chroma re-index skipped: {e}")
 
 from backend.core.limiter import limiter
 
