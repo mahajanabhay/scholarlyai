@@ -5,9 +5,11 @@ from unittest.mock import patch, MagicMock
 
 @pytest.fixture
 def client():
-    with patch("backend.db._init_pool"), \
+    with patch("backend.core.config.GROQ_API_KEY", "test_key"), \
+         patch("backend.db._init_pool"), \
          patch("backend.db.connection_pool", MagicMock()):
         from backend.app import app
+        from fastapi.testclient import TestClient
         return TestClient(app)
 
 

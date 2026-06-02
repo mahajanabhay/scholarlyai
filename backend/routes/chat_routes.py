@@ -16,9 +16,7 @@ from backend.services.chat_history_service import save_message, load_history, ge
 
 router = APIRouter()
 
-from backend.core.config import MAX_FILE_SIZE, MAX_HISTORY, MAX_TOKENS
-# TODO: move to config.py alongside MAX_FILE_SIZE etc.
-MAX_USER_MESSAGE_LEN = 4000  # characters — ~1000 tokens, well within Groq context
+from backend.core.config import MAX_FILE_SIZE, MAX_HISTORY, MAX_TOKENS, MAX_USER_MESSAGE_LEN
 from backend.services.vector_service import get_vector_db
 
 text_splitter = RecursiveCharacterTextSplitter(

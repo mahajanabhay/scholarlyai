@@ -5,20 +5,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from backend import knowledge_routes
 from backend.core.config import ALLOWED_ORIGINS, GROQ_API_KEY, LLM_MODEL
 from backend.db import init_db
-from backend.routes import auth_routes, profile_routes, chat_routes, quiz_routes, study_routes
-knowledge_routes
+from backend.routes import auth_routes, profile_routes, chat_routes, quiz_routes, study_routes, knowledge_routes
 
 
 # ── Startup / shutdown ─────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Runs once when the server starts — creates tables and indexes if missing
+    # Startup
     init_db()
-    yield
-    # (add any shutdown cleanup here if needed)
+
     # Re-index shared knowledge base if Chroma is empty
     try:
         from backend.services.vector_service import get_or_create_collection
@@ -39,6 +36,9 @@ async def lifespan(app: FastAPI):
                 print("ℹ️  No PDFs found in knowledge_uploads — skipping re-index.")
     except Exception as e:
         print(f"⚠️  Chroma re-index skipped: {e}")
+
+    yield
+    # Shutdown cleanup here if needed
 
 from backend.core.limiter import limiter
 
