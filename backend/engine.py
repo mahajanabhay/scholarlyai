@@ -34,6 +34,13 @@ You are a 'Study-Only AI'. You follow these strict rules:
    respond with: "I focus only on academic learning. Would you like help with a study concept instead?"
 
 4. RESPONSE STRUCTURE: Every academic response MUST be valid JSON matching the schema.
+
+5. HALLUCINATION GUARD: You MUST follow these rules to prevent false information:
+   - NEVER invent specific statistics, dates, or figures unless you are certain they are correct.
+   - If you are unsure about a specific fact, say "approximately" or "roughly" instead of stating it as fact.
+   - NEVER fabricate citations, paper titles, author names, or URLs.
+   - If a topic is outside your reliable knowledge, state: "I have limited information on this specific detail — please verify with a textbook or authoritative source."
+   - For medical, legal, or safety-critical topics, always add: "Please verify this with a qualified professional."
 """
 
 EXPLAIN_PROMPT_TEMPLATE = """
@@ -267,6 +274,38 @@ class StudyOnlyAI:
 # ════════════════════════════════════════════════════════════════════════════
 # CLI TESTING
 # ════════════════════════════════════════════════════════════════════════════
+
+# ── Hallucination risk phrases that warrant a disclaimer ──────────────────
+_UNCERTAIN_MARKERS = [
+    "i think", "i believe", "i'm not sure", "not certain",
+    "might be", "could be", "approximately", "roughly",
+    "limited information", "please verify", "consult a professional",
+]
+
+_SAFETY_TOPICS = [
+    "medication", "dosage", "drug", "diagnosis", "legal advice",
+    "law", "statute", "treatment", "surgery", "prescription",
+]
+
+VERIFY_DISCLAIMER = "\n\n⚠️ *Some details above may require verification — please cross-check with a textbook or authoritative source.*"
+SAFETY_DISCLAIMER = "\n\n⚠️ *This content touches on a specialised field. Please verify with a qualified professional before acting on it.*"
+
+
+def apply_hallucination_guard(text: str) -> str:
+    """
+    Post-process any freeform text response and append appropriate disclaimers
+    if uncertainty markers or safety-critical topics are detected.
+    """
+    lower = text.lower()
+
+    if any(marker in lower for marker in _SAFETY_TOPICS):
+        if SAFETY_DISCLAIMER not in text:
+            text += SAFETY_DISCLAIMER
+    elif any(marker in lower for marker in _UNCERTAIN_MARKERS):
+        if VERIFY_DISCLAIMER not in text:
+            text += VERIFY_DISCLAIMER
+
+    return text
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

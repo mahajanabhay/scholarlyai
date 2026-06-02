@@ -1,3 +1,4 @@
+from email import generator
 from http.client import HTTPException
 
 from backend.core.llm import client, LLM_MODEL
@@ -18,6 +19,7 @@ router = APIRouter()
 
 from backend.core.config import MAX_FILE_SIZE, MAX_HISTORY, MAX_TOKENS, MAX_USER_MESSAGE_LEN
 from backend.services.vector_service import get_vector_db
+from backend.engine import apply_hallucination_guard
 
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=1000,
@@ -366,10 +368,11 @@ async def chat_endpoint(
         # Wrap generator to also save AI response to DB
         async def streaming_with_save():
             full_response = ""
-            # gen() is now an async generator — must use async for
-            async for chunk in gen():
+            async for chunk in generator():
                 full_response += chunk
                 yield chunk
+            full_response = apply_hallucination_guard(full_response)
+            # Push DB write to background — calling sync save_message() directly
             # Push DB write to background — calling sync save_message() directly
             # inside an async generator blocks the event loop until the DB commit
             # completes, stalling all other in-flight requests on the server.
