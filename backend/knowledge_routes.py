@@ -8,6 +8,19 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from backend.core.jwt_auth import get_current_user
 from backend.ingest import ingest_pdfs
 
+def require_admin(current_user: dict = Depends(get_current_user)):
+    from backend.db import get_connection, release_connection
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT is_admin FROM users WHERE id = %s", (current_user["user_id"],))
+        row = cur.fetchone()
+        if not row or not row[0]:
+            raise HTTPException(status_code=403, detail="Admin access required.")
+        return current_user
+    finally:
+        release_connection(conn)
+
 router = APIRouter()
 
 UPLOAD_DIR  = os.getenv("KNOWLEDGE_UPLOAD_DIR", "./knowledge_uploads")
@@ -20,7 +33,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.post("/knowledge/upload")
 async def upload_document(
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_admin)
 ):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
@@ -46,7 +59,7 @@ async def list_documents(current_user: dict = Depends(get_current_user)):
 @router.delete("/knowledge/documents/{filename}")
 async def delete_document(
     filename: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_admin)
 ):
     # Sanitise — no path traversal
     if "/" in filename or "\\" in filename or ".." in filename:

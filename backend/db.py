@@ -103,6 +103,7 @@ def init_db():
             is_verified BOOLEAN DEFAULT FALSE,
             verify_token TEXT,
             token_expires_at TIMESTAMP,
+            is_admin BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
