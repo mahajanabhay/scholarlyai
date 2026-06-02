@@ -102,6 +102,7 @@ def init_db():
             subject_focus TEXT[] DEFAULT '{}',
             is_verified BOOLEAN DEFAULT FALSE,
             verify_token TEXT,
+            token_expires_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)

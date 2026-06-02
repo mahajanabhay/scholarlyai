@@ -229,3 +229,68 @@ async def resend_verification(email: str = Form(...)):
         return {"status": "verification email sent"}
     finally:
         release_connection(conn)
+
+@router.post("/auth/forgot-password")
+async def forgot_password(email: str = Form(...)):
+    import secrets
+    from backend.email_service import send_password_reset_email
+    from backend.db import get_connection, release_connection
+    from datetime import datetime, timedelta
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id, name FROM users WHERE email = %s", (email.lower().strip(),))
+        row = cur.fetchone()
+
+        # Always return success to prevent email enumeration
+        if not row:
+            return {"status": "If that email exists, a reset link has been sent."}
+
+        token     = secrets.token_urlsafe(32)
+        expires   = datetime.utcnow() + timedelta(hours=1)
+
+        cur.execute(
+            "UPDATE users SET verify_token = %s, token_expires_at = %s WHERE id = %s",
+            (token, expires, row[0])
+        )
+        conn.commit()
+        send_password_reset_email(email, row[1], token)
+        return {"status": "If that email exists, a reset link has been sent."}
+    finally:
+        release_connection(conn)
+
+
+@router.post("/auth/reset-password")
+async def reset_password(
+    token:        str = Form(...),
+    new_password: str = Form(...),
+):
+    from backend.db import get_connection, release_connection
+    from backend.auth import hash_password
+    from datetime import datetime
+
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT id FROM users
+               WHERE verify_token = %s
+               AND token_expires_at > %s""",
+            (token, datetime.utcnow())
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset link.")
+
+        cur.execute(
+            "UPDATE users SET password_hash = %s, verify_token = NULL, token_expires_at = NULL WHERE id = %s",
+            (hash_password(new_password), row[0])
+        )
+        conn.commit()
+        return {"status": "Password reset successfully."}
+    finally:
+        release_connection(conn)
