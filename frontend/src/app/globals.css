@@ -1,0 +1,182 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────
+   Tailwind v4: dark mode is configured here,
+   not in tailwind.config.js (which v4 ignores).
+───────────────────────────────────────────── */
+@variant dark (&:where(.dark, .dark *));
+
+/* ─────────────────────────────────────────────
+   Content sources — replaces the `content`
+   array from the old tailwind.config.js
+───────────────────────────────────────────── */
+@source "../app/**/*.{js,ts,jsx,tsx,mdx}";
+@source "../pages/**/*.{js,ts,jsx,tsx,mdx}";
+@source "../components/**/*.{js,ts,jsx,tsx,mdx}";
+@source "../src/**/*.{js,ts,jsx,tsx,mdx}";
+
+/* ─────────────────────────────────────────────
+   Smooth scroll behavior for chat
+───────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ─────────────────────────────────────────────
+   Enhanced animations
+───────────────────────────────────────────── */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.animate-slide-in-up {
+  animation: slideInUp 0.3s ease-out;
+}
+
+.animate-fade-in-scale {
+  animation: fadeInScale 0.2s ease-out;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+  background-size: 1000px 100%;
+}
+
+/* ─────────────────────────────────────────────
+   Themed scrollbars — applied via .scrollbar-themed
+───────────────────────────────────────────── */
+
+/* Light mode */
+.scrollbar-themed {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d4d8 transparent;
+}
+
+.scrollbar-themed::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-themed::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-themed::-webkit-scrollbar-thumb {
+  background-color: #d4d4d8;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.scrollbar-themed::-webkit-scrollbar-thumb:hover {
+  background-color: #a1a1aa;
+}
+
+/* Dark mode */
+.dark .scrollbar-themed {
+  scrollbar-color: #3f3f46 transparent;
+}
+
+.dark .scrollbar-themed::-webkit-scrollbar-thumb {
+  background-color: #3f3f46;
+}
+
+.dark .scrollbar-themed::-webkit-scrollbar-thumb:hover {
+  background-color: #52525b;
+}
+
+/* Hide scrollbar when not hovering */
+.scrollbar-themed:not(:hover)::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+
+.dark .scrollbar-themed:not(:hover)::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+
+/* ─────────────────────────────────────────────
+   Enhanced message styling
+───────────────────────────────────────────── */
+.message-bubble {
+  @apply transition-all duration-200;
+}
+
+.message-bubble:hover {
+  @apply shadow-sm;
+}
+
+/* ─────────────────────────────────────────────
+   Input field enhancements
+───────────────────────────────────────────── */
+textarea {
+  field-sizing: content;
+}
+
+/* ─────────────────────────────────────────────
+   Mode indicator badge
+───────────────────────────────────────────── */
+.mode-badge {
+  @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all duration-200;
+}
+
+.mode-badge.learn {
+  @apply bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800;
+}
+
+.mode-badge.quiz {
+  @apply bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800;
+}
+
+.mode-badge.code {
+  @apply bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800;
+}
+
+.mode-badge.analyze {
+  @apply bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800;
+}
+
+/* ─────────────────────────────────────────────
+   Subtle gradient backgrounds
+───────────────────────────────────────────── */
+.gradient-learn {
+  @apply bg-gradient-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-950/20 dark:to-blue-900/10;
+}
+
+.gradient-quiz {
+  @apply bg-gradient-to-br from-purple-50/50 to-purple-100/30 dark:from-purple-950/20 dark:to-purple-900/10;
+}
+
+.gradient-code {
+  @apply bg-gradient-to-br from-emerald-50/50 to-emerald-100/30 dark:from-emerald-950/20 dark:to-emerald-900/10;
+}
+
+.gradient-analyze {
+  @apply bg-gradient-to-br from-orange-50/50 to-orange-100/30 dark:from-orange-950/20 dark:to-orange-900/10;
+}
