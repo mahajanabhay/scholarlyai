@@ -31,7 +31,7 @@ export default function LoginPage() {
         if (d.detail?.toLowerCase().includes("verify")) setForgotEmail(email);
         return;
       }
-      localStorage.setItem("scholarly_token", d.access_token);
+      localStorage.setItem("scholarly_token", d.token);
       localStorage.setItem("scholarly_user_id", d.user_id);
       localStorage.setItem("scholarly_email", email);
       localStorage.setItem("scholarly_name", d.name || "");

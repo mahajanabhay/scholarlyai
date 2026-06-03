@@ -249,7 +249,21 @@ export default function LandingPage() {
         </span>
         <div style={{ display: "flex", gap: "1.5rem" }}>
           {["Privacy Policy", "Terms of Service", "Contact"].map(link => (
-            <a key={link} href="#" style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.25)", textDecoration: "none" }}>{link}</a>
+            <div key={link}>
+              {link === "Privacy Policy" ? (
+                <Link href="/privacy" style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.25)", textDecoration: "none" }}>
+                  {link}
+                </Link>
+              ) : link === "Terms of Service" ? (
+                <Link href="/terms" style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.25)", textDecoration: "none" }}>
+                  {link}
+                </Link>
+              ) : (
+                <a href="mailto:legal@oalstudios.com" style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.25)", textDecoration: "none" }}>
+                  {link}
+                </a>
+              )}
+            </div>
           ))}
         </div>
         <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.2)" }}>© 2025 OAL Studios</span>
