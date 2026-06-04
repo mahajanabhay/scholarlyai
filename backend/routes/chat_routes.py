@@ -276,11 +276,11 @@ Context:
 # CHAT ENDPOINT
 # ─────────────────────────────────────────────
 @router.post("/chat")
+# NEW
 async def chat_endpoint(
     background_tasks: BackgroundTasks,
     message:      str              = Form(...),
     session_id:   str              = Form(...),
-    history:      str              = Form("[]"),
     mode:         str              = Form("LEARN"),
     files:        List[UploadFile] = File(default=[]),
     current_user: dict             = Depends(get_current_user),
@@ -305,13 +305,9 @@ async def chat_endpoint(
         return StreamingResponse(_refuse(), media_type="text/plain")
 
     try:
+        # NEW
         user_id      = current_user["user_id"]
-        history_list = json.loads(history)
-
-        # Load from DB if frontend sends empty history (e.g. page refresh)
-        if not history_list:
-            history_list = load_history(user_id, session_id)
-
+        history_list = load_history(user_id, session_id)
         context_from_files = ""
 
         for file in files:

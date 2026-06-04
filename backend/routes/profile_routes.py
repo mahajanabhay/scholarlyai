@@ -142,10 +142,27 @@ LEVEL_REWARDS = {
     50: "🌟 Legend avatar unlocked",
 }
 
+# NEW — replace with this
+XP_REWARDS = {
+    "message_sent":    5,
+    "quiz_correct":   15,
+    "quiz_perfect":   50,
+    "task_complete":  20,
+    "streak_touch":   10,
+    "session_start":   5,
+}
+
 @router.post("/xp/{user_id}/add")
-async def add_xp_endpoint(user_id: str, amount: int = Form(10), current_user: dict = Depends(get_current_user)):
+async def add_xp_endpoint(
+    user_id: str,
+    action: str = Form(...),
+    current_user: dict = Depends(get_current_user),
+):
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
+    amount = XP_REWARDS.get(action)
+    if amount is None:
+        raise HTTPException(status_code=400, detail=f"Unknown action '{action}'. Valid: {list(XP_REWARDS)}")
     uid = current_user["user_id"]
     prev_level = get_xp(uid).get("level", 1)
     add_xp(uid, amount)

@@ -79,7 +79,7 @@ async def start_study_session(
     returns them all at once so the frontend can run a guided quiz flow.
     """
     try:
-        if not is_academic_query(subject):
+        if not await asyncio.to_thread(is_academic_query, subject):
             raise HTTPException(status_code=400, detail=NON_ACADEMIC_REPLY)
 
         prompt = (

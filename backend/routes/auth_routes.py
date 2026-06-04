@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Form, Request
+from fastapi import APIRouter, Depends, HTTPException, Form, Request, Response
 import json
 from datetime import date
 from backend.auth import User, authenticate_user, get_email_from_user_id, get_user_by_email, get_user_id_from_email
@@ -188,7 +188,7 @@ async def forgot_password(email: str = Form(...)):
         expires   = datetime.utcnow() + timedelta(hours=1)
 
         cur.execute(
-            "UPDATE users SET verify_token = %s, token_expires_at = %s WHERE id = %s",
+            "UPDATE users SET reset_token = %s, reset_token_expires_at = %s WHERE id = %s",
             (token, expires, row[0])
         )
         conn.commit()
@@ -215,8 +215,8 @@ async def reset_password(
         cur = conn.cursor()
         cur.execute(
             """SELECT id FROM users
-               WHERE verify_token = %s
-               AND token_expires_at > %s""",
+               WHERE reset_token = %s
+               AND reset_token_expires_at > %s""",
             (token, datetime.utcnow())
         )
         row = cur.fetchone()
@@ -224,7 +224,7 @@ async def reset_password(
             raise HTTPException(status_code=400, detail="Invalid or expired reset link.")
 
         cur.execute(
-            "UPDATE users SET password_hash = %s, verify_token = NULL, token_expires_at = NULL WHERE id = %s",
+            "UPDATE users SET password_hash = %s, reset_token = NULL, reset_token_expires_at = NULL WHERE id = %s",
             (hash_password(new_password), row[0])
         )
         conn.commit()
