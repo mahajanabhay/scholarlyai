@@ -16,7 +16,6 @@ async def lifespan(app: FastAPI):
     # Startup
     init_db()
 
-    # Re-index shared knowledge base if Chroma is empty
     try:
         from backend.services.vector_service import get_or_create_collection
         from backend.ingest import ingest_pdfs
