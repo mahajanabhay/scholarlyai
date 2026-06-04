@@ -140,7 +140,8 @@ async def verify_email(token: str):
 
 
 @router.post("/auth/resend-verification")
-async def resend_verification(email: str = Form(...)):
+@limiter.limit("3/hour")
+async def resend_verification(request: Request, email: str = Form(...)):
     import secrets
     from backend.email_service import send_verification_email
     from backend.db import get_connection, release_connection
@@ -168,7 +169,8 @@ async def resend_verification(email: str = Form(...)):
         release_connection(conn)
 
 @router.post("/auth/forgot-password")
-async def forgot_password(email: str = Form(...)):
+@limiter.limit("3/hour")
+async def forgot_password(request: Request, email: str = Form(...)):
     import secrets
     from backend.email_service import send_password_reset_email
     from backend.db import get_connection, release_connection
@@ -199,7 +201,9 @@ async def forgot_password(email: str = Form(...)):
 
 
 @router.post("/auth/reset-password")
+@limiter.limit("5/hour")
 async def reset_password(
+    request:      Request,
     token:        str = Form(...),
     new_password: str = Form(...),
 ):
