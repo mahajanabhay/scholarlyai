@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, Form, Request
 import json
 from datetime import date
 from backend.auth import User, authenticate_user, get_email_from_user_id, get_user_by_email, get_user_id_from_email
-from backend.db import get_connection, release_connection
 from backend.core.jwt_auth import create_token, get_current_user
 from backend.core.limiter import limiter
 from backend.services.memory_service import get_streak, push_notification
@@ -116,68 +115,6 @@ async def refresh_token(current_user: dict = Depends(get_current_user)):
     """Issue a fresh token using the existing valid token."""
     new_token = create_token(current_user["user_id"], current_user["email"])
     return {"token": new_token}
-
-@router.post("/auth/profile/{user_id}")
-async def update_profile(
-    user_id:       str,
-    current_user:  dict = Depends(get_current_user),
-    name:          str = Form(None),
-    avatar:        str = Form(None),
-    bio:           str = Form(None),
-    subject_focus: str = Form(None),
-):
-    """Update user profile details"""
-    if current_user["user_id"] != user_id:
-        raise HTTPException(status_code=403, detail="Cannot modify another user's profile")
-    email = get_email_from_user_id(user_id)
-
-    if not email:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    user = get_user_by_email(email)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if name:
-        user.name = name
-    if avatar:
-        user.avatar = avatar
-    if bio:
-        user.bio = bio
-    if subject_focus:
-        # Normalise: frontend sends JSON string, in-memory may already be a list
-        if isinstance(subject_focus, str):
-            try:
-                subject_focus = json.loads(subject_focus)
-            except json.JSONDecodeError:
-                subject_focus = [subject_focus]  # treat bare string as single-item list
-        user.subject_focus = subject_focus if isinstance(subject_focus, list) else []
-
-    conn = get_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE users SET name=%s, avatar=%s, bio=%s, subject_focus=%s WHERE email=%s
-        """, (user.name, user.avatar, user.bio, user.subject_focus, email))
-        conn.commit()
-    finally:
-        release_connection(conn)
-
-    # Evict the in-memory profile cache so the next GET /profile re-reads
-    # from PostgreSQL. Without this, memory_service._profiles[user_id] holds
-    # the pre-update values until the worker restarts.
-    from backend.services.memory_service import _profiles
-    _profiles.pop(user_id, None)
-
-    return {
-        "status": "updated",
-        "user": {
-            "name":          user.name,
-            "avatar":        user.avatar,
-            "bio":           user.bio,
-            "subject_focus": user.subject_focus,
-        },
-    }
 
 @router.get("/auth/verify-email")
 async def verify_email(token: str):
