@@ -340,8 +340,8 @@ async def chat_endpoint(
                 except UnicodeDecodeError:
                     print(f"❌ Could not decode file: {file.filename}")
 
-        db  = get_vector_db(session_id)
-        docs = db.similarity_search(message, k=3)
+        db   = get_vector_db(session_id)
+        docs = await asyncio.to_thread(db.similarity_search, message, k=3)
         db_context = "\n".join([doc.page_content for doc in docs])
 
         combined_context = ""

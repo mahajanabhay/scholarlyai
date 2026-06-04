@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Form, Request, Response
 import json
 from datetime import date
@@ -17,7 +18,7 @@ async def login(
     password: str = Form(...)
 ):
     """Login user — max 10 attempts per minute per IP"""
-    success, message, user = authenticate_user(email, password)
+    success, message, user = await asyncio.to_thread(authenticate_user, email, password)
 
     if not success:
         raise HTTPException(status_code=401, detail=message)

@@ -432,3 +432,14 @@ def load_notifications_from_db(user_id: str) -> list | None:
         return None
     finally:
         release_connection(conn)
+
+async def run_query(fn, *args, **kwargs):
+    """
+    Run any synchronous DB function on the thread pool so it never
+    blocks the uvicorn event loop.
+
+    Usage:
+        result = await run_query(some_sync_db_fn, arg1, arg2)
+    """
+    import asyncio
+    return await asyncio.to_thread(fn, *args, **kwargs)
