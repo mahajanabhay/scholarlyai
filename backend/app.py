@@ -8,7 +8,18 @@ from slowapi.errors import RateLimitExceeded
 from backend.core.config import ALLOWED_ORIGINS, GROQ_API_KEY, LLM_MODEL
 from backend.db import init_db
 from backend.routes import auth_routes, profile_routes, chat_routes, quiz_routes, study_routes, knowledge_routes
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[FastApiIntegration(), StarletteIntegration()],
+        traces_sample_rate=0.2,
+        environment=os.getenv("ENVIRONMENT", "production"),
+    )
 
 # ── Startup / shutdown ─────────────────────────
 @asynccontextmanager
