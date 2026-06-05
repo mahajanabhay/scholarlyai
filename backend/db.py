@@ -37,8 +37,8 @@ def _init_pool() -> None:
     global connection_pool
     try:
         connection_pool = psycopg2.pool.ThreadedConnectionPool(
-            1,   # min connections
-            10,  # max connections
+            5,   # min connections
+            50,  # max connections
             host=DB_HOST,
             port=DB_PORT,
             database=DB_NAME,
@@ -73,7 +73,11 @@ def get_connection():
                 "Database connection pool is not available. "
                 "Check that PostgreSQL is running and credentials are correct."
             )
-        return connection_pool.getconn()
+        conn = connection_pool.getconn()
+        if conn.closed:
+            connection_pool.putconn(conn)
+            raise RuntimeError("Retrieved a closed connection from pool.")
+        return conn
 
 
 def release_connection(conn) -> None:
