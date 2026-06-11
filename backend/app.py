@@ -72,3 +72,18 @@ app.include_router(chat_routes.router)
 app.include_router(quiz_routes.router)
 app.include_router(study_routes.router)
 app.include_router(knowledge_routes.router)
+
+@app.get("/health")
+async def health_check():
+    from backend.db import get_connection, release_connection, connection_pool
+    status = {"api": "ok", "db": "error", "pool_available": 0}
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        release_connection(conn)
+        status["db"] = "ok"
+        status["pool_available"] = connection_pool.maxconn - len(connection_pool._used)
+    except Exception as e:
+        status["db_error"] = str(e)
+    return status
