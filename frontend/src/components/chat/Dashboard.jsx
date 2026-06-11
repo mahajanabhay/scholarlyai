@@ -111,6 +111,7 @@ export default function Dashboard() {
   const [pwNew, setPwNew]           = useState('');
   const [pwMsg, setPwMsg]           = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [weeklyProgress, setWeeklyProgress] = useState(null);
 
   const chatEndRef         = useRef(null);
   const abortControllerRef = useRef(null);
@@ -197,6 +198,20 @@ export default function Dashboard() {
       apiFetch(`${API_URL}/papers/${uid}`).then(r => r.json()).then(d => {
         setPreviousPapers((d.papers || []).map(p => p.content));
       }).catch(e => console.error('[papers]', e)),
+      // Load weekly progress
+      apiFetch(`${API_URL}/profile/${uid}/progress`)
+        .then(r => r.json())
+        .then(d => {
+          const p = d.progress || [];
+          const totals = p.reduce((acc, day) => ({
+            quizzes:    acc.quizzes    + day.quizzes_passed,
+            weaknesses: acc.weaknesses + day.weaknesses_cleared,
+            xp:         acc.xp        + day.xp_earned,
+            minutes:    acc.minutes   + day.study_minutes,
+          }), { quizzes: 0, weaknesses: 0, xp: 0, minutes: 0 });
+          setWeeklyProgress(totals);
+        })
+        .catch(() => {})
     ]);
 
     return () => { if (abortControllerRef.current) abortControllerRef.current.abort(); };
@@ -982,6 +997,44 @@ export default function Dashboard() {
 
           {/* Messages */}
           <main className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
+
+            <XPBar
+              xpData={xpData}
+              streakData={streakData}
+            />
+
+            {weeklyProgress && (weeklyProgress.quizzes > 0 || weeklyProgress.xp > 0) && (
+              <div className="mx-4 mt-2 px-4 py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center gap-3 flex-wrap">
+                <span className="text-xs font-semibold text-violet-400">This week:</span>
+
+                {weeklyProgress.quizzes > 0 && (
+                  <span className="text-xs text-zinc-400">
+                    🧠 <strong className="text-zinc-200">{weeklyProgress.quizzes}</strong>
+                    {" "}quiz{weeklyProgress.quizzes > 1 ? "zes" : ""}
+                  </span>
+                )}
+
+                {weeklyProgress.weaknesses > 0 && (
+                  <span className="text-xs text-zinc-400">
+                    📉 <strong className="text-zinc-200">{weeklyProgress.weaknesses}</strong>
+                    {" "}weakness{weeklyProgress.weaknesses > 1 ? "es" : ""} cleared
+                  </span>
+                )}
+
+                {weeklyProgress.xp > 0 && (
+                  <span className="text-xs text-zinc-400">
+                    ⚡ <strong className="text-zinc-200">{weeklyProgress.xp}</strong> XP earned
+                  </span>
+                )}
+
+                {weeklyProgress.minutes > 0 && (
+                  <span className="text-xs text-zinc-400">
+                    ⏱ <strong className="text-zinc-200">{weeklyProgress.minutes}</strong> min studied
+                  </span>
+                )}
+              </div>
+            )}
+
             {chatHistory.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center px-4 pt-16">
                 {/* Personalized Greeting */}
@@ -999,7 +1052,7 @@ export default function Dashboard() {
                 <div className="w-full max-w-md mb-12">
                   <button
                     onClick={() => { setMode('QUIZ'); setQuizType('single'); setIsQuizActive(true); setMessage(''); setFiles([]); }}
-                    className="w-full flex items-center justify-between px-8 py-5 rounded-2xl border-2 border-green-400 dark:border-green-500 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 hover:from-green-100 hover:to-emerald-100 dark:hover:from-green-900 dark:hover:to-emerald-900 transition-all hover:shadow-lg font-semibold text-green-900 dark:text-green-100"
+                    className="w-full flex items-center justify-between px-8 py-5 rounded-2xl border-2 border-green-400 dark:border-green-500 bg-linear-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 hover:from-green-100 hover:to-emerald-100 dark:hover:from-green-900 dark:hover:to-emerald-900 transition-all hover:shadow-lg font-semibold text-green-900 dark:text-green-100"
                   >
                     <div className="flex items-center gap-3">
                       <Zap size={24} className="text-green-600 dark:text-green-400" />
@@ -1026,7 +1079,7 @@ export default function Dashboard() {
                       <button
                         key={text}
                         onClick={() => setMessage(text)}
-                        className="group relative flex flex-col items-center justify-center gap-2 px-4 py-5 rounded-2xl border border-zinc-200 dark:border-white/[0.07] bg-white dark:bg-white/[0.02] hover:bg-zinc-50 dark:hover:bg-white/[0.05] hover:border-violet-300 dark:hover:border-violet-500/40 hover:shadow-md hover:shadow-violet-100 dark:hover:shadow-violet-900/10 transition-all duration-200 text-center"
+                        className="group relative flex flex-col items-center justify-center gap-2 px-4 py-5 rounded-2xl border border-zinc-200 dark:border-white/[0.07] bg-white dark:bg-white/2 hover:bg-zinc-50 dark:hover:bg-white/5 hover:border-violet-300 dark:hover:border-violet-500/40 hover:shadow-md hover:shadow-violet-100 dark:hover:shadow-violet-900/10 transition-all duration-200 text-center"
                       >
                         <span className="text-2xl group-hover:scale-110 transition-transform duration-200">{icon}</span>
                         <p className="text-xs font-medium text-zinc-600 dark:text-zinc-300 leading-snug group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors">{text}</p>
@@ -1043,10 +1096,10 @@ export default function Dashboard() {
                 className={`flex gap-4 group ${chat.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div className={`flex gap-3 max-w-[85%] ${chat.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <div className={`p-1.5 rounded-lg h-fit flex-shrink-0 ${chat.role === 'user' ? 'bg-violet-500/20 text-violet-400' : mode === 'CODE' ? 'bg-emerald-600/90 text-white' : 'bg-zinc-900 dark:bg-white/90 text-white dark:text-zinc-900'}`}>
+                  <div className={`p-1.5 rounded-lg h-fit shrink-0 ${chat.role === 'user' ? 'bg-violet-500/20 text-violet-400' : mode === 'CODE' ? 'bg-emerald-600/90 text-white' : 'bg-zinc-900 dark:bg-white/90 text-white dark:text-zinc-900'}`}>
                     {chat.role === 'user' ? <User size={16} /> : mode === 'CODE' ? <Code2 size={16} /> : <Bot size={16} />}
                   </div>
-                  <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${chat.role === 'user' ? 'bg-violet-600 dark:bg-violet-600 text-white rounded-br-sm shadow-md shadow-violet-900/20' : mode === 'CODE' && chat.role === 'assistant' ? 'border border-emerald-900/40 bg-[#0d1a12] text-zinc-100 rounded-bl-sm' : 'bg-white dark:bg-white/[0.04] border border-zinc-200 dark:border-white/[0.07] rounded-bl-sm shadow-sm text-zinc-800 dark:text-zinc-100'}`}>
+                  <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${chat.role === 'user' ? 'bg-violet-600 dark:bg-violet-600 text-white rounded-br-sm shadow-md shadow-violet-900/20' : mode === 'CODE' && chat.role === 'assistant' ? 'border border-emerald-900/40 bg-[#0d1a12] text-zinc-100 rounded-bl-sm' : 'bg-white dark:bg-white/4 border border-zinc-200 dark:border-white/[0.07] rounded-bl-sm shadow-sm text-zinc-800 dark:text-zinc-100'}`}>
                     {chat.isFeedback ? (
                       <FeedbackCard 
                         feedback={chat.content.replace("**Feedback:** ", "")} 
@@ -1134,7 +1187,7 @@ export default function Dashboard() {
                   <div className={`p-1 rounded-lg h-fit ${mode === 'CODE' ? 'bg-emerald-600 text-white' : 'bg-black dark:bg-white text-white dark:text-black'}`}>
                     {mode === 'CODE' ? <Code2 size={16} /> : <Bot size={16} />}
                   </div>
-                  <div className="px-4 py-3 rounded-2xl text-sm bg-white dark:bg-white/[0.04] border border-zinc-200 dark:border-white/[0.07] text-zinc-500 dark:text-zinc-500 flex items-center gap-2 rounded-bl-sm shadow-sm">
+                  <div className="px-4 py-3 rounded-2xl text-sm bg-white dark:bg-white/4 border border-zinc-200 dark:border-white/[0.07] text-zinc-500 dark:text-zinc-500 flex items-center gap-2 rounded-bl-sm shadow-sm">
                     <span className="inline-flex gap-1">
                       <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{animationDelay:'0ms'}} />
                       <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" style={{animationDelay:'150ms'}} />
@@ -1150,7 +1203,7 @@ export default function Dashboard() {
           </main>
 
           {/* Input */}
-          <footer className="px-4 md:px-6 py-3 md:py-4 bg-slate-100 dark:bg-[#09090b]/90 backdrop-blur-xl border-t border-zinc-200 dark:border-white/[0.06]">
+          <footer className="px-4 md:px-6 py-3 md:py-4 bg-slate-100 dark:bg-[#09090b]/90 backdrop-blur-xl border-t border-zinc-200 dark:border-white/6">
             <div className="max-w-3xl mx-auto relative">
               {files.map((f, i) => (
                 <div key={`file-${f.name}-${i}`} className="inline-flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800 p-2 rounded-lg text-xs mr-2 mb-2">
@@ -1161,7 +1214,7 @@ export default function Dashboard() {
               ))}
 
               {(!isQuizActive || quizType === "paper") ? (
-                <div className={`flex items-end gap-2 p-3 rounded-2xl border transition-all duration-200 shadow-sm focus-within:shadow-lg ${mode === 'CODE' ? 'bg-[#0d1a12] border-emerald-800/60 focus-within:border-emerald-600/60' : 'bg-white dark:bg-white/[0.03] border-zinc-300 dark:border-white/[0.08] focus-within:border-violet-500 dark:focus-within:border-violet-500/40 focus-within:shadow-lg focus-within:shadow-violet-200 dark:focus-within:shadow-violet-900/10'}`}>
+                <div className={`flex items-end gap-2 p-3 rounded-2xl border transition-all duration-200 shadow-sm focus-within:shadow-lg ${mode === 'CODE' ? 'bg-[#0d1a12] border-emerald-800/60 focus-within:border-emerald-600/60' : 'bg-white dark:bg-white/3 border-zinc-300 dark:border-white/8 focus-within:border-violet-500 dark:focus-within:border-violet-500/40 focus-within:shadow-lg focus-within:shadow-violet-200 dark:focus-within:shadow-violet-900/10'}`}>
                   <label className="p-2 cursor-pointer">
                     <Paperclip size={20} className={mode === 'CODE' ? 'text-zinc-400' : ''} />
                     <input type="file" multiple className="hidden" onChange={e => setFiles(prev => [...prev, ...Array.from(e.target.files)])} />
@@ -1181,7 +1234,7 @@ export default function Dashboard() {
                     className={`flex-1 bg-transparent border-none outline-none p-2 resize-none text-sm leading-relaxed ${mode === 'CODE' ? 'text-zinc-100 placeholder-zinc-500' : 'text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500'}`}
                   />
                   {message.length > 3500 && (
-                    <span className={`text-[10px] self-end mb-1 flex-shrink-0 ${message.length >= 4000 ? 'text-red-400' : 'text-zinc-500'}`}>
+                    <span className={`text-[10px] self-end mb-1 shrink-0 ${message.length >= 4000 ? 'text-red-400' : 'text-zinc-500'}`}>
                       {message.length}/4000
                     </span>
                   )}
@@ -1206,8 +1259,8 @@ export default function Dashboard() {
           {/* Level-Up Toast */}
           {levelUpToast && (
             <div className="fixed bottom-8 right-6 z-50">
-              <div className="bg-gradient-to-br from-violet-600 to-indigo-700 text-white px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-4 min-w-[280px] border border-violet-400/30 animate-slide-up">
-                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <div className="bg-linear-to-br from-violet-600 to-indigo-700 text-white px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-4 min-w-70 border border-violet-400/30 animate-slide-up">
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
                   <span className="text-2xl">⬆️</span>
                 </div>
                 <div className="flex-1">
@@ -1222,7 +1275,7 @@ export default function Dashboard() {
                 </div>
                 <button
                   onClick={() => setLevelUpToast(null)}
-                  className="text-white/50 hover:text-white text-lg leading-none flex-shrink-0"
+                  className="text-white/50 hover:text-white text-lg leading-none shrink-0"
                 >×</button>
               </div>
             </div>
@@ -1231,7 +1284,7 @@ export default function Dashboard() {
           {/* Milestone Toast */}
           {milestoneToast && (
             <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-bounce-once">
-              <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 min-w-[300px]">
+              <div className="bg-linear-to-r from-amber-500 to-orange-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 min-w-75">
                 <span className="text-3xl">{milestoneToast.emoji}</span>
                 <div>
                   <p className="font-black text-sm">{milestoneToast.title}</p>
@@ -1272,7 +1325,7 @@ export default function Dashboard() {
 
       {showKnowledge && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/[0.07] rounded-2xl shadow-2xl w-full max-w-md h-[600px] flex flex-col relative">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/[0.07] rounded-2xl shadow-2xl w-full max-w-md h-150 flex flex-col relative">
             <button
               onClick={() => setShowKnowledge(false)}
               className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 z-10"
@@ -1288,11 +1341,11 @@ export default function Dashboard() {
       {showSettings && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md" onClick={() => setShowSettings(false)}>
           <div
-            className="relative flex w-[680px] h-[560px] rounded-2xl overflow-hidden shadow-2xl bg-white dark:bg-[#111113] border border-zinc-200 dark:border-white/[0.07]"
+            className="relative flex w-170 h-140 rounded-2xl overflow-hidden shadow-2xl bg-white dark:bg-[#111113] border border-zinc-200 dark:border-white/[0.07]"
             onClick={e => e.stopPropagation()}
           >
             {/* Left nav */}
-            <div className="w-52 flex-shrink-0 flex flex-col border-r h-full bg-zinc-50 dark:bg-[#0d0d0f] border-r border-zinc-200 dark:border-white/[0.07]">
+            <div className="w-52 shrink-0 flex flex-col border-r h-full bg-zinc-50 dark:bg-[#0d0d0f] border-zinc-200 dark:border-white/[0.07]">
               <div className="p-5 border-b border-zinc-200 dark:border-white/[0.07]">
                 <button onClick={() => setShowSettings(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.07] transition">
                   <X size={16} />
@@ -1310,8 +1363,8 @@ export default function Dashboard() {
                     onClick={() => setSettingsTab(id)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
                       settingsTab === id
-                        ? 'bg-violet-50 dark:bg-white/[0.08] text-violet-700 dark:text-white font-semibold'
-                        : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.04]'
+                        ? 'bg-violet-50 dark:bg-white/8 text-violet-700 dark:text-white font-semibold'
+                        : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/4'
                     }`}
                   >
                     <Icon size={15} />{label}
@@ -1328,7 +1381,7 @@ export default function Dashboard() {
                 <div className="p-7 space-y-6">
                   <h2 className="text-lg font-bold text-zinc-900 dark:text-white">General</h2>
                   {/* Appearance */}
-                  <div className="flex items-center justify-between py-4 border-b border-zinc-100 dark:border-white/[0.06]">
+                  <div className="flex items-center justify-between py-4 border-b border-zinc-100 dark:border-white/6">
                     <div>
                       <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Appearance</p>
                       <p className="text-xs text-zinc-500 mt-0.5">Choose light or dark interface</p>
@@ -1341,7 +1394,7 @@ export default function Dashboard() {
                     </button>
                   </div>
                   {/* Pomodoro */}
-                  <div className="flex items-center justify-between py-4 border-b border-zinc-100 dark:border-white/[0.06]">
+                  <div className="flex items-center justify-between py-4 border-b border-zinc-100 dark:border-white/6">
                     <div>
                       <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Pomodoro Timer</p>
                       <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-0.5">Focus timer with 25/5 min cycles</p>
@@ -1365,7 +1418,7 @@ export default function Dashboard() {
                           className={`py-2 px-3 rounded-xl text-xs font-semibold transition-all ${
                             mode === m
                               ? 'bg-violet-600 text-white'
-                              : 'bg-zinc-100 dark:bg-white/[0.05] text-zinc-600 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+                              : 'bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
                           }`}
                         >{m}</button>
                       ))}
@@ -1423,7 +1476,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="h-2.5 rounded-full overflow-hidden mb-2" style={{ background: 'rgba(255,255,255,0.15)' }}>
-                      <div className="h-full bg-gradient-to-r from-amber-300 to-yellow-400 rounded-full transition-all duration-700"
+                      <div className="h-full bg-linear-to-r from-amber-300 to-yellow-400 rounded-full transition-all duration-700"
                         style={{ width: `${Math.round(((xpData?.total || 0) % 500) / 500 * 100)}%` }} />
                     </div>
                     <div className="flex justify-between">
@@ -1462,7 +1515,7 @@ export default function Dashboard() {
                             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
                               selected
                                 ? 'bg-violet-600 text-white border-violet-600'
-                                : 'bg-zinc-100 dark:bg-white/[0.05] text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-white/[0.07] hover:border-violet-500/50'
+                                : 'bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-white/[0.07] hover:border-violet-500/50'
                             }`}
                           >{s}</button>
                         );
@@ -1470,7 +1523,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="border-t border-zinc-100 dark:border-white/[0.06] pt-4 space-y-3">
+                  <div className="border-t border-zinc-100 dark:border-white/6 pt-4 space-y-3">
                     {[
                       { icon: AlertTriangle, color: 'text-orange-400', bg: 'rgba(249,115,22,0.12)', label: 'Weakness Tracker', desc: 'Review & fix your wrong answers', action: () => { setShowSettings(false); setShowWeakness(true); }, badge: weaknessCount > 0 ? weaknessCount : null },
                       { icon: Calendar,      color: 'text-blue-400',   bg: 'rgba(59,130,246,0.12)',  label: 'Daily Planner',   desc: 'AI-generated daily study plan',   action: () => { setShowSettings(false); setShowPlanner(true); } },
@@ -1479,9 +1532,9 @@ export default function Dashboard() {
                       <button
                         key={label}
                         onClick={action}
-                        className="w-full flex items-center gap-4 p-4 rounded-2xl transition-all hover:scale-[1.01] text-left bg-zinc-50 dark:bg-white/[0.03] border border-zinc-200 dark:border-white/[0.07] hover:bg-zinc-100 dark:hover:bg-white/[0.06]"
+                        className="w-full flex items-center gap-4 p-4 rounded-2xl transition-all hover:scale-[1.01] text-left bg-zinc-50 dark:bg-white/3 border border-zinc-200 dark:border-white/[0.07] hover:bg-zinc-100 dark:hover:bg-white/6"
                       >
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: bg }}>
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: bg }}>
                           <Icon size={18} className={color} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1489,9 +1542,9 @@ export default function Dashboard() {
                           <p className="text-xs text-zinc-500 mt-0.5">{desc}</p>
                         </div>
                         {badge && (
-                          <span className="w-6 h-6 rounded-full bg-orange-500 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0">{badge}</span>
+                          <span className="w-6 h-6 rounded-full bg-orange-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">{badge}</span>
                         )}
-                        <ChevronRight size={16} className="text-zinc-700 flex-shrink-0" />
+                        <ChevronRight size={16} className="text-zinc-700 shrink-0" />
                       </button>
                     ))}
                   </div>
@@ -1502,8 +1555,8 @@ export default function Dashboard() {
               {settingsTab === 'account' && (
                 <div className="p-7 space-y-4">
                   <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Account</h2>
-                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-zinc-50 dark:bg-white/[0.03] border border-zinc-200 dark:border-white/[0.07]">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-700 flex items-center justify-center text-2xl shadow-lg">
+                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-zinc-50 dark:bg-white/3 border border-zinc-200 dark:border-white/[0.07]">
+                    <div className="w-12 h-12 rounded-2xl bg-linear-to-br from-violet-600 to-indigo-700 flex items-center justify-center text-2xl shadow-lg">
                       {profileData?.avatar || '🎓'}
                     </div>
                     <div className="flex-1">
@@ -1513,13 +1566,13 @@ export default function Dashboard() {
                     <button onClick={() => { setShowSettings(false); setShowProfile(true); }} className="px-3 py-1.5 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-all bg-zinc-100 dark:bg-white/[0.07]">Edit Profile</button>
                   </div>
                   {/* Change Password */}
-                  <div className="py-4 border-b border-zinc-100 dark:border-white/[0.06]">
+                  <div className="py-4 border-b border-zinc-100 dark:border-white/6">
                     <p className="text-xs text-zinc-400 dark:text-zinc-600 uppercase tracking-widest font-bold mb-3">Change Password</p>
                     <div className="space-y-2">
                       <input
                         type="password" placeholder="Current password" value={pwCurrent}
                         onChange={e => setPwCurrent(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl text-sm bg-zinc-100 dark:bg-white/[0.05] border border-zinc-200 dark:border-white/[0.07] text-zinc-800 dark:text-zinc-200 outline-none focus:border-violet-500/50"
+                        className="w-full px-3 py-2 rounded-xl text-sm bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/[0.07] text-zinc-800 dark:text-zinc-200 outline-none focus:border-violet-500/50"
                       />
                       <div className="flex justify-end">
                         <button
@@ -1532,7 +1585,7 @@ export default function Dashboard() {
                       <input
                         type="password" placeholder="New password (min 8 chars)" value={pwNew}
                         onChange={e => setPwNew(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl text-sm bg-zinc-100 dark:bg-white/[0.05] border border-zinc-200 dark:border-white/[0.07] text-zinc-800 dark:text-zinc-200 outline-none focus:border-violet-500/50"
+                        className="w-full px-3 py-2 rounded-xl text-sm bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/[0.07] text-zinc-800 dark:text-zinc-200 outline-none focus:border-violet-500/50"
                       />
                       {pwMsg && <p className={`text-xs font-semibold ${pwMsg.ok ? 'text-green-500' : 'text-red-400'}`}>{pwMsg.text}</p>}
                       <button
@@ -1554,7 +1607,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="py-4 border-b border-zinc-100 dark:border-white/[0.06]">
+                  <div className="py-4 border-b border-zinc-100 dark:border-white/6">
                     <p className="text-xs text-zinc-400 dark:text-zinc-600 uppercase tracking-widest font-bold mb-3">Danger Zone</p>
                     <button
                       onClick={() => { localStorage.removeItem('scholarly_token'); localStorage.removeItem('scholarly_user_id'); localStorage.removeItem('scholarly_email'); localStorage.removeItem('scholarly_name'); window.location.href = '/login'; }}
@@ -1594,7 +1647,7 @@ export default function Dashboard() {
               placeholder="your@email.com"
               value={forgotEmail}
               onChange={e => setForgotEmail(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl text-sm bg-zinc-100 dark:bg-white/[0.05] border border-zinc-200 dark:border-white/[0.07] text-zinc-800 dark:text-zinc-200 outline-none focus:border-violet-500/50"
+              className="w-full px-3 py-2 rounded-xl text-sm bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/[0.07] text-zinc-800 dark:text-zinc-200 outline-none focus:border-violet-500/50"
             />
             {forgotMsg && (
               <p className={`text-xs font-semibold ${forgotMsg.ok ? 'text-green-500' : 'text-red-400'}`}>{forgotMsg.text}</p>
@@ -1602,7 +1655,7 @@ export default function Dashboard() {
             <div className="flex gap-2">
               <button
                 onClick={() => { setShowForgotPassword(false); setForgotMsg(null); setForgotEmail(''); }}
-                className="flex-1 py-2 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-white/[0.05] text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-white/[0.08] transition-all"
+                className="flex-1 py-2 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-white/8 transition-all"
               >Cancel</button>
               <button
                 disabled={forgotLoading || !forgotEmail}

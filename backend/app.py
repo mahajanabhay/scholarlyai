@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 import os
+import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -8,7 +9,7 @@ from slowapi.errors import RateLimitExceeded
 from backend.core.config import ALLOWED_ORIGINS, GROQ_API_KEY, LLM_MODEL
 from backend.db import init_db
 from backend.routes import auth_routes, profile_routes, chat_routes, quiz_routes, study_routes, knowledge_routes
-import sentry_sdk
+
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 
