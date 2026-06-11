@@ -657,3 +657,10 @@ async def mark_onboarding_complete(
         return {"status": "onboarding complete"}
     finally:
         release_connection(conn)
+
+@router.get("/profile/{user_id}/progress")
+async def get_progress(user_id: str, current_user: dict = Depends(get_current_user)):
+    if user_id != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access forbidden.")
+    from backend.db import get_weekly_progress
+    return {"progress": get_weekly_progress(user_id)}

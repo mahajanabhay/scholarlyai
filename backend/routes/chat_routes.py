@@ -380,6 +380,13 @@ async def chat_endpoint(
             except Exception:
                 pass
 
+            # Record study progress
+            try:
+                from backend.db import record_progress
+                record_progress(user_id, study_minutes=1)
+            except Exception:
+                pass
+
         return StreamingResponse(streaming_with_save(), media_type="text/plain")
 
     except Exception as e:

@@ -505,6 +505,20 @@ async def quiz_endpoint(
         except Exception:
             pass
 
+        # Award streak for verified quiz activity
+        try:
+            from backend.services.memory_service import touch_streak
+            touch_streak(current_user["user_id"])
+        except Exception:
+            pass
+
+        # Record quiz progress
+        try:
+            from backend.db import record_progress
+            record_progress(current_user["user_id"], quizzes_passed=1)
+        except Exception:
+            pass
+
         return {
             "feedback":        feedback,
             "new_question":    new_question,

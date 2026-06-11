@@ -223,6 +223,22 @@ def init_db():
         )
         """)
 
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_progress (
+            id                 SERIAL PRIMARY KEY,
+            user_id            TEXT NOT NULL,
+            date               DATE NOT NULL DEFAULT CURRENT_DATE,
+            weaknesses_cleared INTEGER DEFAULT 0,
+            quizzes_passed     INTEGER DEFAULT 0,
+            xp_earned          INTEGER DEFAULT 0,
+            study_minutes      INTEGER DEFAULT 0,
+            UNIQUE (user_id, date),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """)
+
+        conn.commit()
+
         conn.commit()
         print("✅ Database tables and indexes initialized successfully")
     except Exception as e:
@@ -420,6 +436,44 @@ def upsert_notifications(user_id: str, notifications: list) -> None:
     except Exception as e:
         conn.rollback()
         print(f"⚠️ Failed to upsert notifications for {user_id}: {e}")
+    finally:
+        release_connection(conn)
+
+def record_progress(user_id: str, weaknesses_cleared: int = 0, quizzes_passed: int = 0, xp_earned: int = 0, study_minutes: int = 0):
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO user_progress (user_id, date, weaknesses_cleared, quizzes_passed, xp_earned, study_minutes)
+            VALUES (%s, CURRENT_DATE, %s, %s, %s, %s)
+            ON CONFLICT (user_id, date) DO UPDATE SET
+                weaknesses_cleared = user_progress.weaknesses_cleared + EXCLUDED.weaknesses_cleared,
+                quizzes_passed     = user_progress.quizzes_passed     + EXCLUDED.quizzes_passed,
+                xp_earned          = user_progress.xp_earned          + EXCLUDED.xp_earned,
+                study_minutes      = user_progress.study_minutes      + EXCLUDED.study_minutes
+        """, (user_id, weaknesses_cleared, quizzes_passed, xp_earned, study_minutes))
+        conn.commit()
+    except Exception as e:
+        print(f"⚠️ record_progress error: {e}")
+    finally:
+        release_connection(conn)
+
+
+def get_weekly_progress(user_id: str) -> list:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT date, weaknesses_cleared, quizzes_passed, xp_earned, study_minutes
+            FROM user_progress
+            WHERE user_id = %s AND date >= CURRENT_DATE - INTERVAL '7 days'
+            ORDER BY date ASC
+        """, (user_id,))
+        rows = cur.fetchall()
+        return [{"date": str(r[0]), "weaknesses_cleared": r[1], "quizzes_passed": r[2], "xp_earned": r[3], "study_minutes": r[4]} for r in rows]
+    except Exception as e:
+        print(f"⚠️ get_weekly_progress error: {e}")
+        return []
     finally:
         release_connection(conn)
 
