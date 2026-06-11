@@ -386,13 +386,27 @@ async def chat_endpoint(
 # ─────────────────────────────────────────────
 @router.get("/chat/history/{session_id}")
 async def get_chat_history(
-    session_id:   str,
-    current_user: dict = Depends(get_current_user),
+    session_id: str,
+    limit: int = 100,
+    offset: int = 0,
+    current_user: dict = Depends(get_current_user)
 ):
-    """Load chat history for a session from the database"""
-    user_id = current_user["user_id"]
-    history = load_history(user_id, session_id)
-    return {"session_id": session_id, "history": history}
+    from backend.db import get_connection, release_connection
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT role, content, mode FROM chat_sessions
+               WHERE user_id = %s AND session_id = %s
+               ORDER BY created_at ASC
+               LIMIT %s OFFSET %s""",
+            (current_user["user_id"], session_id, limit, offset)
+        )
+        rows = cur.fetchall()
+        history = [{"role": r[0], "content": r[1], "mode": r[2]} for r in rows]
+        return {"history": history, "limit": limit, "offset": offset, "count": len(history)}
+    finally:
+        release_connection(conn)
 
 
 @router.get("/chat/sessions")
