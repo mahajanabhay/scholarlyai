@@ -373,6 +373,12 @@ async def chat_endpoint(
             # inside an async generator blocks the event loop until the DB commit
             # completes, stalling all other in-flight requests on the server.
             background_tasks.add_task(save_message, user_id, session_id, "assistant", full_response, mode)
+            # Award streak for real study exchange
+            try:
+                from backend.services.memory_service import touch_streak
+                touch_streak(current_user["user_id"])
+            except Exception:
+                pass
 
         return StreamingResponse(streaming_with_save(), media_type="text/plain")
 

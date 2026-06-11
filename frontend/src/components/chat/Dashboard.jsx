@@ -180,9 +180,11 @@ export default function Dashboard() {
       }).catch(e => console.error('[xp]', e)),
       apiFetch(`${API_URL}/profile/${uid}`).then(r => r.json()).then(d => {
         setProfileData(d);
-        if (!data?.onboarding_complete) {
+
+        if (!d?.onboarding_complete) {
           setShowOnboarding(true);
         }
+
         localStorage.setItem(`scholarly_profile_${uid}`, JSON.stringify(d));
       }).catch(e => console.error('[profile]', e)),
       apiFetch(`${API_URL}/notifications/${uid}`).then(r => r.json()).then(d => {
@@ -476,24 +478,6 @@ export default function Dashboard() {
 
     // Touch streak on real study activity — send local date so server
     // respects the user's timezone, not UTC server time
-    const clientDate = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local TZ
-    const streakForm = new FormData();
-    streakForm.append('client_date', clientDate);
-    apiFetch(`${API_URL}/streak/${userId}/touch`, {
-      method: 'POST',
-      body: streakForm,
-    }).then(r => r.json()).then(data => {
-      setStreakData(data);
-      // Show milestone toast if the server flagged one
-      if (data.milestone) {
-        setMilestoneToast(data.milestone);
-        setTimeout(() => setMilestoneToast(null), 6000);
-        // Refresh XP and notifications since milestone grants bonus XP
-        refreshNotifications();
-        apiFetch(`${API_URL}/xp/${userId}`)
-          .then(r => r.json()).then(setXpData).catch(e => console.error('[xp:milestone]', e));
-      }
-    }).catch(e => console.error('[streak:touch]', e));
 
     if (!sessions[currentId] || sessions[currentId].length === 0) {
       const title = message.substring(0, 25) + (message.length > 25 ? "..." : "");

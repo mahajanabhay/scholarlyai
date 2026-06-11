@@ -498,6 +498,13 @@ async def quiz_endpoint(
         quiz_mem["asked_questions"].append(question_summary)
         print(f"✅ Question {question_number} generated on [{quiz_mem['quiz_topic']}]: {question_summary[:100]}")
 
+        # Award streak for verified quiz activity
+        try:
+            from backend.services.memory_service import touch_streak
+            touch_streak(current_user["user_id"])
+        except Exception:
+            pass
+
         return {
             "feedback":        feedback,
             "new_question":    new_question,

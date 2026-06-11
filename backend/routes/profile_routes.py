@@ -97,30 +97,26 @@ async def get_streak_endpoint(user_id: str, current_user: dict = Depends(get_cur
     return get_streak(current_user["user_id"])
 
 @router.post("/streak/{user_id}/touch")
-async def touch_streak_endpoint(
-    user_id:     str,
+async def touch_streak(
+    user_id: str,
+    action: str = Form(...),
     current_user: dict = Depends(get_current_user)
 ):
+    """
+    Only award streak for verified server-side actions.
+    Valid actions: quiz_complete, study_session_end, chat_exchange
+    """
+    VALID_ACTIONS = {"quiz_complete", "study_session_end", "chat_exchange"}
+
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
-    uid = current_user["user_id"]
-    touch_streak(uid)
-    streak = get_streak(uid)
 
-    MILESTONE_META = {
-        3:   {"emoji": "🔥", "title": "3-Day Streak!",   "message": "You're on a roll!",                     "xp": 25},
-        7:   {"emoji": "🔥", "title": "7-Day Streak!",   "message": "One full week of learning!",            "xp": 50},
-        14:  {"emoji": "⚡", "title": "2-Week Streak!",  "message": "Two weeks strong!",                     "xp": 75},
-        30:  {"emoji": "🏆", "title": "30-Day Streak!",  "message": "A whole month of dedication!",         "xp": 150},
-        60:  {"emoji": "🌟", "title": "60-Day Streak!",  "message": "Your commitment is extraordinary!",    "xp": 250},
-        100: {"emoji": "👑", "title": "100-Day Streak!", "message": "You've achieved something remarkable!", "xp": 500},
-        365: {"emoji": "🎓", "title": "365-Day Streak!", "message": "A full year. Legendary status.",       "xp": 1000},
-    }
+    if action not in VALID_ACTIONS:
+        raise HTTPException(status_code=400, detail=f"Invalid action. Must be one of: {VALID_ACTIONS}")
 
-    from datetime import date
-    milestone = MILESTONE_META.get(streak["current"]) if streak.get("last_active") == date.today().isoformat() else None
-
-    return {**streak, "milestone": milestone}
+    from backend.services.memory_service import touch_streak as _touch_streak
+    result = _touch_streak(user_id)
+    return result
 
 
 # ── XP / Level System ─────────────────────────
