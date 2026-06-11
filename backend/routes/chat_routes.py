@@ -364,7 +364,7 @@ async def chat_endpoint(
         # Wrap generator to also save AI response to DB
         async def streaming_with_save():
             full_response = ""
-            async for chunk in generator():
+            async for chunk in gen():
                 full_response += chunk
                 yield chunk
             full_response = apply_hallucination_guard(full_response)
