@@ -641,3 +641,23 @@ async def change_password(
         return {"status": "password updated"}
     finally:
         release_connection(conn)
+
+@router.post("/profile/{user_id}/onboarding-complete")
+async def mark_onboarding_complete(
+    user_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    if user_id != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access forbidden.")
+    from backend.db import get_connection, release_connection
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE users SET onboarding_complete = TRUE WHERE id = %s",
+            (user_id,)
+        )
+        conn.commit()
+        return {"status": "onboarding complete"}
+    finally:
+        release_connection(conn)

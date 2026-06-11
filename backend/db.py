@@ -109,6 +109,7 @@ def init_db():
             reset_token TEXT,
             reset_token_expires_at TIMESTAMP,
             is_admin BOOLEAN DEFAULT FALSE,
+            onboarding_complete BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)

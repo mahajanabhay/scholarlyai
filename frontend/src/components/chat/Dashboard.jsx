@@ -9,6 +9,7 @@ import PlannerPanel from "@/components/planner/PlannerPanel";
 import WeaknessPanel from "@/components/profile/WeaknessPanel";
 import NotificationsPanel from "@/components/profile/NotificationsPanel";
 import KnowledgePanel from "@/components/panel/KnowledgePanel";
+import OnboardingModal from "@/components/onboarding/OnboardingModal";
 
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -109,6 +110,7 @@ export default function Dashboard() {
   const [pwCurrent, setPwCurrent]   = useState('');
   const [pwNew, setPwNew]           = useState('');
   const [pwMsg, setPwMsg]           = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const chatEndRef         = useRef(null);
   const abortControllerRef = useRef(null);
@@ -178,6 +180,9 @@ export default function Dashboard() {
       }).catch(e => console.error('[xp]', e)),
       apiFetch(`${API_URL}/profile/${uid}`).then(r => r.json()).then(d => {
         setProfileData(d);
+        if (!data?.onboarding_complete) {
+          setShowOnboarding(true);
+        }
         localStorage.setItem(`scholarly_profile_${uid}`, JSON.stringify(d));
       }).catch(e => console.error('[profile]', e)),
       apiFetch(`${API_URL}/notifications/${uid}`).then(r => r.json()).then(d => {
@@ -1636,6 +1641,17 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+      )}
+      {showOnboarding && (
+        <OnboardingModal
+          userId={userId}
+          apiFetch={apiFetch}
+          onComplete={(subjects, topic) => {
+            setShowOnboarding(false);
+            setProfileData(prev => ({ ...prev, subject_focus: subjects, onboarding_complete: true }));
+            if (topic) setInputValue(topic);
+          }}
+        />
       )}
     </div>
   );

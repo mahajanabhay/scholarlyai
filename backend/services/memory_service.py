@@ -37,17 +37,18 @@ def get_profile(user_id: str) -> dict:
             try:
                 cursor = conn.cursor()
                 cursor.execute(
-                    "SELECT name, avatar, bio, subject_focus FROM users WHERE id = %s",
+                    "SELECT name, avatar, bio, subject_focus, onboarding_complete FROM users WHERE id = %s",
                     (user_id,)
                 )
                 row = cursor.fetchone()
                 if row:
                     _profiles[user_id] = {
-                        "name":          row[0] or "Scholar",
-                        "avatar":        row[1] or "🎓",
-                        "bio":           row[2] or "",
-                        "subject_focus": row[3] if isinstance(row[3], list) else [],
-                        "joined":        date.today().isoformat(),
+                        "name":                row[0] or "Scholar",
+                        "avatar":              row[1] or "🎓",
+                        "bio":                 row[2] or "",
+                        "subject_focus":       row[3] if isinstance(row[3], list) else [],
+                        "onboarding_complete": bool(row[4]),
+                        "joined":              date.today().isoformat(),
                     }
                 else:
                     raise ValueError("User not found")
@@ -55,8 +56,11 @@ def get_profile(user_id: str) -> dict:
                 release_connection(conn)
         except Exception:
             _profiles[user_id] = {
-                "name": "Scholar", "avatar": "🎓",
-                "bio": "", "subject_focus": [],
+                "name": "Scholar",
+                "avatar": "🎓",
+                "bio": "",
+                "subject_focus": [],
+                "onboarding_complete": False,
                 "joined": date.today().isoformat(),
             }
     return _profiles[user_id]
