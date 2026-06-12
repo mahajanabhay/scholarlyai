@@ -1,6 +1,7 @@
 import json
 from datetime import date, datetime
 from collections import OrderedDict
+from backend.core.cache import get as cache_get, set as cache_set, delete as cache_delete
 
 from backend.db import (
     get_connection, release_connection,
@@ -31,6 +32,10 @@ _quiz_memory: OrderedDict = OrderedDict()
 # ── Profiles ──────────────────────────────────────────────────────────────────
 
 def get_profile(user_id: str) -> dict:
+    cached = cache_get(f"profile:{user_id}")
+    if cached:
+        _profiles[user_id] = cached
+        return cached
     if user_id not in _profiles:
         try:
             conn = get_connection()
@@ -63,17 +68,23 @@ def get_profile(user_id: str) -> dict:
                 "onboarding_complete": False,
                 "joined": date.today().isoformat(),
             }
+    cache_set(f"profile:{user_id}", _profiles[user_id])
     return _profiles[user_id]
 
 
 # ── Streaks ───────────────────────────────────────────────────────────────────
 
 def get_streak(user_id: str) -> dict:
+    cached = cache_get(f"streak:{user_id}")
+    if cached:
+        _streaks[user_id] = cached
+        return cached
     if user_id not in _streaks:
         try:
             db_streak = load_streak_from_db(user_id)
             if db_streak:
                 _streaks[user_id] = db_streak
+                cache_set(f"streak:{user_id}", db_streak)
                 return _streaks[user_id]
         except Exception as e:
             print(f"⚠️ [streak] DB load failed for {user_id}: {e}")
@@ -86,6 +97,7 @@ def get_streak(user_id: str) -> dict:
         s.setdefault("freeze_used", False)
         s.setdefault("freeze_week", None)
         s.setdefault("recovered_today", False)
+    cache_set(f"streak:{user_id}", _streaks[user_id])
     return _streaks[user_id]
 
 
@@ -134,6 +146,7 @@ def touch_streak(user_id: str, client_date: str | None = None):
 
     try:
         upsert_streak(user_id, streak)
+        cache_set(f"streak:{user_id}", streak)
     except Exception as e:
         print(f"⚠️ [streak] DB upsert failed for {user_id}: {e}")
 
@@ -156,6 +169,10 @@ def touch_streak(user_id: str, client_date: str | None = None):
 # ── XP ────────────────────────────────────────────────────────────────────────
 
 def get_xp(user_id: str) -> dict:
+    cached = cache_get(f"xp:{user_id}")
+    if cached:
+        _xp[user_id] = cached
+        return cached
     if user_id not in _xp:
         db_xp = None
         try:
@@ -163,6 +180,7 @@ def get_xp(user_id: str) -> dict:
         except Exception as e:
             print(f"⚠️ [xp] DB load failed for {user_id}: {e}")
         _xp[user_id] = db_xp if db_xp else {"total": 0, "level": 1}
+    cache_set(f"xp:{user_id}", _xp[user_id])
     return _xp[user_id]
 
 
@@ -172,6 +190,7 @@ def add_xp(user_id: str, amount: int):
     xp["level"]  = 1 + xp["total"] // 500
     try:
         upsert_xp(user_id, xp)
+        cache_set(f"xp:{user_id}", xp)
     except Exception as e:
         print(f"⚠️ [xp] DB upsert failed for {user_id}: {e}")
 
@@ -179,6 +198,10 @@ def add_xp(user_id: str, amount: int):
 # ── Weaknesses ────────────────────────────────────────────────────────────────
 
 def get_weaknesses(user_id: str) -> list:
+    cached = cache_get(f"weaknesses:{user_id}")
+    if cached:
+        _weaknesses[user_id] = cached
+        return cached
     if user_id not in _weaknesses:
         db_w = None
         try:
@@ -186,6 +209,7 @@ def get_weaknesses(user_id: str) -> list:
         except Exception as e:
             print(f"⚠️ [weaknesses] DB load failed for {user_id}: {e}")
         _weaknesses[user_id] = db_w if db_w is not None else []
+    cache_set(f"weaknesses:{user_id}", _weaknesses[user_id])
     return _weaknesses[user_id]
 
 
