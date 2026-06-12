@@ -115,12 +115,12 @@ export default function StudySessionModal({ userId, onClose, onStartQuiz }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-[480px] max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-120 max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="p-5 border-b dark:border-zinc-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-linear-to-br from-violet-500 to-blue-500 flex items-center justify-center">
               <GraduationCap size={18} className="text-white" />
             </div>
             <div>
@@ -158,7 +158,7 @@ export default function StudySessionModal({ userId, onClose, onStartQuiz }) {
                   className="w-full text-sm bg-zinc-50 dark:bg-zinc-800 border dark:border-zinc-700 rounded-xl px-3 py-2 outline-none mt-1" />
               )}
               <button onClick={startSession} disabled={!finalSubject || loading}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white font-bold text-sm disabled:opacity-40 transition hover:opacity-90">
+                className="w-full py-3 rounded-xl bg-linear-to-r from-violet-600 to-blue-600 text-white font-bold text-sm disabled:opacity-40 transition hover:opacity-90">
                 {loading ? 'Loading first question…' : `Start 5-Question Session →`}
               </button>
             </div>
@@ -190,7 +190,7 @@ export default function StudySessionModal({ userId, onClose, onStartQuiz }) {
                       <button key={opt.letter} onClick={() => !loading && handleAnswer(opt.letter, parsed.text)}
                         disabled={loading}
                         className="flex items-center gap-3 w-full text-left px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:border-violet-400 dark:hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 text-sm transition disabled:opacity-50">
-                        <span className="flex items-center justify-center w-6 h-6 rounded border border-zinc-300 dark:border-zinc-600 font-bold text-xs flex-shrink-0">{opt.letter}</span>
+                        <span className="flex items-center justify-center w-6 h-6 rounded border border-zinc-300 dark:border-zinc-600 font-bold text-xs shrink-0">{opt.letter}</span>
                         {opt.text}
                       </button>
                     ))}

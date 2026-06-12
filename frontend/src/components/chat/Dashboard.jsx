@@ -339,18 +339,18 @@ export default function Dashboard() {
   };
 
   // Award XP helper — detects level-up and shows celebration toast
-  const awardXp = async (amount = 10) => {
+  const awardXp = async (action = "message_sent") => {
     const prevLevel = xpData?.level || 1;
-    const fd = new FormData(); fd.append('amount', amount);
+    const fd = new FormData(); fd.append('action', action);
     const r = await apiFetch(`${API_URL}/xp/${userId}/add`, { method: 'POST', body: fd });
-    const d = await r.json();
-    setXpData(d);
-    // Fire level-up toast if level increased
-    if (d.level && d.level > prevLevel) {
-      const reward = LEVEL_REWARDS[d.level] || null;
-      setLevelUpToast({ level: d.level, reward });
-      setTimeout(() => setLevelUpToast(null), 5000);
-    }
+      if (!r.ok) return;
+      const data = await r.json();
+      setXpData(data);
+      if (data.level && data.level > prevLevel) {
+        const reward = LEVEL_REWARDS[data.level] || null;
+        setLevelUpToast({ level: data.level, reward });
+        setTimeout(() => setLevelUpToast(null), 5000);
+      }
   };
 
   // Refresh notifications count
@@ -424,7 +424,7 @@ export default function Dashboard() {
       setIsQuestionAnswered(false);
 
       // Award XP per quiz question answered
-      await awardXp(wasWrong ? 5 : 15);
+      await awardXp(wasWrong ? "message_sent" : "quiz_correct");
 
     } catch (error) {
       console.error("Quiz error:", error);
@@ -646,7 +646,7 @@ export default function Dashboard() {
         abortControllerRef.current = null;
 
         // Award XP for chat messages
-        await awardXp(10);
+        await awardXp("message_sent");
       }
     } catch (error) {
       console.error("Send error:", error);

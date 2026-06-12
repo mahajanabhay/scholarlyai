@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { getAuthHeaders } from '@/lib/api';
+import { apiFetch, getAuthHeaders } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -12,7 +12,7 @@ export function AutoPlanModal({ userId, onClose, onXpUpdate }) {
 
   useEffect(() => {
     // Load existing weaknesses to personalise the plan
-    fetch(`${API_URL}/weaknesses/${userId}`, { headers: getAuthHeaders() }).then(r => r.json())
+    apiFetch(`${API_URL}/weaknesses/${userId}`).then(r => r.json())
       .then(d => setWeakTopics((d.weaknesses || []).map(w => w.topic)))
       .catch(() => {});
   }, [userId]);
@@ -31,7 +31,7 @@ export function AutoPlanModal({ userId, onClose, onXpUpdate }) {
     fd.append('history', '[]');
 
     try {
-      const r = await fetch(`${API_URL}/chat`, { method: 'POST', body: fd });
+      const r = await apiFetch(`${API_URL}/chat`, { method: 'POST', body: fd });
       let raw = '';
       const reader = r.body.getReader();
       const decoder = new TextDecoder();
@@ -55,7 +55,7 @@ export function AutoPlanModal({ userId, onClose, onXpUpdate }) {
         const tfd = new FormData();
         tfd.append('title',   task.title);
         tfd.append('subject', task.subject);
-        await fetch(`${API_URL}/planner/${userId}/add`, { method: 'POST', body: tfd });
+        await apiFetch(`${API_URL}/planner/${userId}/add`, { method: 'POST', body: tfd });
       }
 
       setTasks(planTasks);
@@ -78,7 +78,7 @@ export function AutoPlanModal({ userId, onClose, onXpUpdate }) {
     setChecked(prev => ({ ...prev, [task.id]: nowDone }));
     if (nowDone) {
       const fd = new FormData(); fd.append('amount', 20);
-      const r = await fetch(`${API_URL}/xp/${userId}/add`, { method: 'POST', body: fd });
+      const r = await apiFetch(`${API_URL}/xp/${userId}/add`, { method: 'POST', body: fd });
       const d = await r.json();
       onXpUpdate(d);
     }

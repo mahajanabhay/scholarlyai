@@ -6,7 +6,7 @@ import {
   Clock, Target, Sparkles, ListTodo, AlertTriangle,
   Send, Star, Lock
 } from 'lucide-react';
-import { getAuthHeaders } from '@/lib/api';
+import { apiFetch, getAuthHeaders } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -145,9 +145,9 @@ function VerifyModal({ task, taskType, userId, onClose, onVerified }) {
       fd.append('task_created', task.created || '');
       if (taskType === 'general') fd.append('proof', proof.trim());
 
-      const r = await fetch(
+      const r = await apiFetch(
         `${API_URL}/planner/${userId}/verify/${task.id}`,
-        { method: 'POST', headers: getAuthHeaders(), body: fd }
+        { method: 'POST', body: fd }
       );
       const d = await r.json();
       setResult({ verified: d.verified, feedback: d.feedback, xp: d.xp });
@@ -160,8 +160,8 @@ function VerifyModal({ task, taskType, userId, onClose, onVerified }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className={`bg-zinc-900 border ${guide.border} rounded-2xl shadow-2xl w-[400px] max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className={`bg-zinc-900 border ${guide.border} rounded-2xl shadow-2xl w-100 max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="p-5 border-b border-zinc-800">
@@ -215,7 +215,7 @@ function VerifyModal({ task, taskType, userId, onClose, onVerified }) {
                   <div className="space-y-2">
                     {guide.steps.map(s => (
                       <div key={s.n} className="flex items-start gap-3">
-                        <span className={`flex-shrink-0 w-5 h-5 rounded-full border ${guide.border} flex items-center justify-center text-[10px] font-bold ${guide.color}`}>
+                        <span className={`shrink-0 w-5 h-5 rounded-full border ${guide.border} flex items-center justify-center text-[10px] font-bold ${guide.color}`}>
                           {s.n}
                         </span>
                         <p className="text-xs text-zinc-300 leading-relaxed pt-0.5">{s.text}</p>
@@ -238,7 +238,7 @@ function VerifyModal({ task, taskType, userId, onClose, onVerified }) {
                 {/* Bot note */}
                 {guide.note && (
                   <div className="flex items-start gap-2 pt-1">
-                    <Lock size={11} className="text-zinc-600 flex-shrink-0 mt-0.5" />
+                    <Lock size={11} className="text-zinc-600 shrink-0 mt-0.5" />
                     <p className="text-[10px] text-zinc-600 leading-relaxed italic">{guide.note}</p>
                   </div>
                 )}
@@ -251,7 +251,7 @@ function VerifyModal({ task, taskType, userId, onClose, onVerified }) {
                 className={`w-full py-3 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 ${
                   loading
                     ? 'bg-zinc-800 text-zinc-500'
-                    : 'bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white disabled:opacity-40'
+                    : 'bg-linear-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white disabled:opacity-40'
                 }`}
               >
                 {loading ? (
@@ -288,7 +288,7 @@ function TaskRow({ task, onVerify, onDelete }) {
         {/* Check / verify button */}
         <button
           onClick={() => !task.done && onVerify(task, type)}
-          className={`flex-shrink-0 mt-0.5 transition-transform active:scale-90 ${task.done ? 'cursor-default' : 'cursor-pointer hover:scale-110'}`}
+          className={`shrink-0 mt-0.5 transition-transform active:scale-90 ${task.done ? 'cursor-default' : 'cursor-pointer hover:scale-110'}`}
           title={task.done ? 'Completed' : 'Click to complete — AI will verify you actually did this'}
         >
           {task.done
@@ -339,7 +339,7 @@ function TaskRow({ task, onVerify, onDelete }) {
         {/* Delete */}
         <button
           onClick={onDelete}
-          className="flex-shrink-0 text-zinc-700 hover:text-red-400 transition p-1 mt-0.5"
+          className="shrink-0 text-zinc-700 hover:text-red-400 transition p-1 mt-0.5"
         >
           <Trash2 size={13} />
         </button>
@@ -365,7 +365,7 @@ export default function PlannerPanel({ userId, onClose, onXpUpdate }) {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch(`${API_URL}/planner/${userId}`, { headers: getAuthHeaders() });
+      const r = await apiFetch(`${API_URL}/planner/${userId}`);
       const d = await r.json();
       setTasks(d.tasks || []);
     } catch {}
@@ -380,7 +380,7 @@ export default function PlannerPanel({ userId, onClose, onXpUpdate }) {
     const fd = new FormData();
     fd.append('title', title);
     fd.append('subject', subject);
-    await fetch(`${API_URL}/planner/${userId}/add`, { method: 'POST', headers: getAuthHeaders(), body: fd });
+    await apiFetch(`${API_URL}/planner/${userId}/add`, { method: 'POST', body: fd });
     setTitle('');
     setShowAdd(false);
     load();
@@ -388,7 +388,7 @@ export default function PlannerPanel({ userId, onClose, onXpUpdate }) {
   };
 
   const del = async (taskId) => {
-    await fetch(`${API_URL}/planner/${userId}/delete/${taskId}`, { method: 'POST', headers: getAuthHeaders() });
+    await apiFetch(`${API_URL}/planner/${userId}/delete/${taskId}`, { method: 'POST' });
     load();
   };
 
@@ -397,7 +397,7 @@ export default function PlannerPanel({ userId, onClose, onXpUpdate }) {
     setGeneratedCount(null);
     try {
       const fd = new FormData();
-      const r  = await fetch(`${API_URL}/planner/${userId}/generate`, { method: 'POST', headers: getAuthHeaders(), body: fd });
+      const r  = await apiFetch(`${API_URL}/planner/${userId}/generate`, { method: 'POST', body: fd });
       const d  = await r.json();
       setGeneratedCount(d.tasks?.length || 3);
       await load();
@@ -441,11 +441,11 @@ export default function PlannerPanel({ userId, onClose, onXpUpdate }) {
 
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
         <div
-          className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl w-[440px] max-h-[88vh] flex flex-col"
+          className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl w-110 max-h-[88vh] flex flex-col"
           onClick={e => e.stopPropagation()}
         >
           {/* ── Header ── */}
-          <div className="p-5 border-b border-zinc-800 flex-shrink-0">
+          <div className="p-5 border-b border-zinc-800 shrink-0">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center">
@@ -471,7 +471,7 @@ export default function PlannerPanel({ userId, onClose, onXpUpdate }) {
                 <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
-                      allDone ? 'bg-green-500' : 'bg-gradient-to-r from-blue-500 to-violet-500'
+                      allDone ? 'bg-green-500' : 'bg-linear-to-r from-blue-500 to-violet-500'
                     }`}
                     style={{ width: `${pct}%` }}
                   />
@@ -495,7 +495,7 @@ export default function PlannerPanel({ userId, onClose, onXpUpdate }) {
             }`}>
               {generatedCount !== null && !generating ? (
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center shrink-0">
                     <CheckCircle2 size={16} className="text-green-400" />
                   </div>
                   <div className="flex-1">
@@ -509,7 +509,7 @@ export default function PlannerPanel({ userId, onClose, onXpUpdate }) {
               ) : (
                 <>
                   <div className="flex items-start gap-3 mb-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center shrink-0 mt-0.5">
                       <Sparkles size={15} className="text-blue-400" />
                     </div>
                     <div>
@@ -535,7 +535,7 @@ export default function PlannerPanel({ userId, onClose, onXpUpdate }) {
                   <button
                     onClick={generatePlan}
                     disabled={generating}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white text-sm font-bold disabled:opacity-50 transition"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-linear-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white text-sm font-bold disabled:opacity-50 transition"
                   >
                     {generating
                       ? <><RefreshCw size={15} className="animate-spin" /> Building your plan…</>
@@ -548,7 +548,7 @@ export default function PlannerPanel({ userId, onClose, onXpUpdate }) {
             {/* How it works — shown only when tasks exist and none done */}
             {total > 0 && done === 0 && (
               <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
-                <AlertTriangle size={13} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                <AlertTriangle size={13} className="text-amber-500 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-amber-400/80 leading-relaxed">
                   <span className="font-bold text-amber-400">Tasks are locked until verified.</span> Click the circle on a task to submit proof of completion. The AI will check your work before awarding XP.
                 </p>
@@ -603,7 +603,7 @@ export default function PlannerPanel({ userId, onClose, onXpUpdate }) {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-zinc-400">No tasks yet</p>
-                  <p className="text-xs text-zinc-600 mt-1 max-w-[220px] leading-relaxed">
+                  <p className="text-xs text-zinc-600 mt-1 max-w-55 leading-relaxed">
                     Generate your AI plan above, or add your own tasks below.
                   </p>
                 </div>
@@ -612,7 +612,7 @@ export default function PlannerPanel({ userId, onClose, onXpUpdate }) {
           </div>
 
           {/* ── Footer: Add task ── */}
-          <div className="p-4 border-t border-zinc-800 flex-shrink-0">
+          <div className="p-4 border-t border-zinc-800 shrink-0">
             {!showAdd ? (
               <button
                 onClick={() => setShowAdd(true)}

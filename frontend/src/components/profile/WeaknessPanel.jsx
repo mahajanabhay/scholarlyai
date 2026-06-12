@@ -5,7 +5,7 @@ import {
   BookOpen, ChevronDown, ChevronUp, Zap, CheckCircle2,
   Target, Brain, ArrowRight, RotateCcw
 } from 'lucide-react';
-import { getAuthHeaders } from '@/lib/api';
+import { apiFetch, getAuthHeaders } from '@/lib/api';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -28,8 +28,8 @@ function RetryQuiz({ subject, weakQuestions, onClose, onDone }) {
     fd.append('subject', subject);
     fd.append('weak_topic_questions', JSON.stringify(weakQuestions));
     fd.append('num_questions', '4');
-    fetch(`${API_URL}/study-session/retry-weak`, {
-      method: 'POST', headers: getAuthHeaders(), body: fd
+    apiFetch(`${API_URL}/study-session/retry-weak`, {
+      method: 'POST', body: fd
     })
       .then(r => r.json())
       .then(d => { setQuestions(d.questions || []); setLoading(false); })
@@ -120,7 +120,7 @@ function RetryQuiz({ subject, weakQuestions, onClose, onDone }) {
             }`} />
           ))}
         </div>
-        <span className="text-[10px] text-zinc-500 flex-shrink-0">{current + 1}/{questions.length}</span>
+        <span className="text-[10px] text-zinc-500 shrink-0">{current + 1}/{questions.length}</span>
       </div>
 
       {/* Question */}
@@ -148,7 +148,7 @@ function RetryQuiz({ subject, weakQuestions, onClose, onDone }) {
           }
           return (
             <button key={opt.letter} className={cls} onClick={() => handleAnswer(opt.letter)} disabled={!!feedback}>
-              <span className={`flex-shrink-0 w-6 h-6 rounded border text-xs font-bold flex items-center justify-center ${
+              <span className={`shrink-0 w-6 h-6 rounded border text-xs font-bold flex items-center justify-center ${
                 !feedback ? 'border-zinc-600 text-zinc-400' :
                 isCorrect ? 'border-green-500 text-green-400' :
                 isSelected ? 'border-red-500 text-red-400' :
@@ -195,7 +195,7 @@ export default function WeaknessPanel({ userId, onClose }) {
 
   const load = useCallback(() => {
     setLoading(true);
-    fetch(`${API_URL}/weaknesses/${userId}`, { headers: getAuthHeaders() })
+    apiFetch(`${API_URL}/weaknesses/${userId}`)
       .then(r => r.json())
       .then(d => { setWeaknesses(d.weaknesses || []); setLoading(false); })
       .catch(() => setLoading(false));
@@ -205,7 +205,7 @@ export default function WeaknessPanel({ userId, onClose }) {
 
   const getRevision = async () => {
     setLoadingRevision(true);
-    const r = await fetch(`${API_URL}/revision/${userId}`, { headers: getAuthHeaders() });
+    const r = await apiFetch(`${API_URL}/revision/${userId}`);
     const d = await r.json();
     setRevision(d.revision || '');
     setLoadingRevision(false);
@@ -214,8 +214,8 @@ export default function WeaknessPanel({ userId, onClose }) {
   const clear = async (topic) => {
     const fd = new FormData();
     if (topic && topic !== 'all') fd.append('topic', topic);
-    await fetch(`${API_URL}/weaknesses/${userId}/clear`, {
-      method: 'POST', headers: getAuthHeaders(), body: fd
+    await apiFetch(`${API_URL}/weaknesses/${userId}/clear`, {
+      method: 'POST', body: fd
     });
     setConfirmClear(null);
     setExpandedTopic(null);
@@ -245,11 +245,11 @@ export default function WeaknessPanel({ userId, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl w-[460px] max-h-[85vh] flex flex-col"
+        className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl w-115 max-h-[85vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        <div className="p-5 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
+        <div className="p-5 border-b border-zinc-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center">
               <Brain size={18} className="text-orange-400" />
@@ -299,7 +299,7 @@ export default function WeaknessPanel({ userId, onClose }) {
                     <Shield size={28} className="text-green-400" />
                   </div>
                   <p className="text-sm font-semibold text-zinc-300">You're all caught up!</p>
-                  <p className="text-xs text-zinc-500 text-center max-w-[240px]">
+                  <p className="text-xs text-zinc-500 text-center max-w-60">
                     Wrong quiz answers will appear here automatically so you can target them directly.
                   </p>
                 </div>
@@ -326,12 +326,12 @@ export default function WeaknessPanel({ userId, onClose }) {
                     <div className="p-3">
                       <div className="flex items-start gap-3">
                         {/* Severity dot */}
-                        <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${sev.dot}`} />
+                        <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${sev.dot}`} />
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-sm font-semibold text-zinc-200 truncate">{topic}</p>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${sev.badge} border`}>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${sev.badge} border`}>
                               {sev.label}
                             </span>
                           </div>
@@ -376,7 +376,7 @@ export default function WeaknessPanel({ userId, onClose }) {
                         <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide mb-2">Specific questions you got wrong</p>
                         {questions.map((q, i) => (
                           <div key={i} className="flex items-start gap-2 text-xs text-zinc-400 leading-relaxed">
-                            <span className="text-red-500 flex-shrink-0 mt-0.5">✗</span>
+                            <span className="text-red-500 shrink-0 mt-0.5">✗</span>
                             <span>{typeof q === 'string' ? q : q.question || 'Unknown question'}</span>
                           </div>
                         ))}
@@ -392,7 +392,7 @@ export default function WeaknessPanel({ userId, onClose }) {
                   <button
                     onClick={getRevision}
                     disabled={loadingRevision}
-                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xs font-bold disabled:opacity-40 flex items-center justify-center gap-2 transition"
+                    className="w-full py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xs font-bold disabled:opacity-40 flex items-center justify-center gap-2 transition"
                   >
                     <BookOpen size={14} className={loadingRevision ? 'animate-pulse' : ''} />
                     {loadingRevision ? 'Generating revision plan…' : '✨ Generate Full Revision Plan'}
@@ -419,7 +419,7 @@ export default function WeaknessPanel({ userId, onClose }) {
                           </ReactMarkdown>
                         </div>
                         {/* Scroll hint */}
-                        <div className="sticky bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-zinc-800 to-transparent pointer-events-none" />
+                        <div className="sticky bottom-0 left-0 right-0 h-6 bg-linear-to-t from-zinc-800 to-transparent pointer-events-none" />
                       </div>
                     </div>
                   )}
@@ -431,7 +431,7 @@ export default function WeaknessPanel({ userId, onClose }) {
 
         {/* ── Footer ── */}
         {!retryTopic && totalCount > 0 && (
-          <div className="p-4 border-t border-zinc-800 flex-shrink-0">
+          <div className="p-4 border-t border-zinc-800 shrink-0">
             {confirmClear ? (
               <div className="flex items-center gap-3">
                 <p className="text-xs text-zinc-400 flex-1">
