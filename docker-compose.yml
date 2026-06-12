@@ -1,6 +1,18 @@
 version: "3.9"
 
 services:
+  chroma:
+      image: chromadb/chroma:latest
+      restart: unless-stopped
+      ports:
+        - "8001:8000"
+      volumes:
+        - chromadata:/chroma/chroma
+      healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+        interval: 5s
+        timeout: 5s
+        retries: 5
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -41,6 +53,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      chroma:
+        condition: service_healthy
     volumes:
       - ./chroma_db:/app/chroma_db
       - ./data_backup:/app/data_backup
@@ -61,6 +75,7 @@ services:
 
 volumes:
   pgdata:
+  chromadata:
 
 nginx:
     image: nginx:alpine

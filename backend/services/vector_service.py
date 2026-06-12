@@ -3,6 +3,20 @@ from collections import OrderedDict
 from langchain_chroma import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from backend.core.config import CHROMA_BASE_DIR, EMBED_MODEL
+import chromadb
+
+CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
+CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8001"))
+
+try:
+    _chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
+    _chroma_client.heartbeat()
+    _USE_HTTP_CHROMA = True
+    print(f"✅ Chroma HTTP connected at {CHROMA_HOST}:{CHROMA_PORT}")
+except Exception as e:
+    print(f"⚠️  Chroma HTTP unavailable — using local PersistentClient: {e}")
+    _chroma_client = None
+    _USE_HTTP_CHROMA = False
 
 # Lazy-loaded — HuggingFaceEmbeddings downloads ~90MB model on first call.
 # Loading at import time blocks every worker startup and crashes the app
@@ -30,21 +44,26 @@ _quiz_memory: dict[str, dict] = {}
 
 def get_vector_db(session_id: str) -> Chroma:
     if session_id in _db_cache:
-        # Move to end to mark as most recently used
         _db_cache.move_to_end(session_id)
         return _db_cache[session_id]
 
-    # Evict the oldest entry before opening a new connection
     if len(_db_cache) >= _DB_CACHE_MAX:
         evicted_id, _ = _db_cache.popitem(last=False)
         print(f"[vector_service] Evicted session '{evicted_id}' from Chroma cache (cap={_DB_CACHE_MAX})")
 
-    persist_dir = os.path.join(CHROMA_BASE_DIR, session_id)
-    os.makedirs(persist_dir, exist_ok=True)
-    _db_cache[session_id] = Chroma(
-        persist_directory=persist_dir,
-        embedding_function=_get_embeddings(),
-    )
+    if _USE_HTTP_CHROMA and _chroma_client:
+        _db_cache[session_id] = Chroma(
+            client=_chroma_client,
+            collection_name=f"session_{session_id}",
+            embedding_function=_get_embeddings(),
+        )
+    else:
+        persist_dir = os.path.join(CHROMA_BASE_DIR, session_id)
+        os.makedirs(persist_dir, exist_ok=True)
+        _db_cache[session_id] = Chroma(
+            persist_directory=persist_dir,
+            embedding_function=_get_embeddings(),
+        )
     return _db_cache[session_id]
 
 def get_quiz_memory(session_id: str) -> dict:
