@@ -304,6 +304,24 @@ async def chat_endpoint(
             yield NON_ACADEMIC_REPLY
         return StreamingResponse(_refuse(), media_type="text/plain")
 
+    # Groq availability check — fast fail before streaming starts
+    try:
+        from backend.core.llm import client as _client
+        await asyncio.wait_for(
+            asyncio.to_thread(
+                _client.chat.completions.create,
+                model=LLM_MODEL,
+                messages=[{"role": "user", "content": "ping"}],
+                max_tokens=1,
+                timeout=3.0,
+            ),
+            timeout=4.0,
+        )
+    except Exception:
+        def _unavailable():
+            yield "⚠️ The AI service is temporarily unavailable. Please try again in a moment."
+        return StreamingResponse(_unavailable(), media_type="text/plain")
+
     try:
         # NEW
         user_id      = current_user["user_id"]

@@ -112,6 +112,7 @@ export default function Dashboard() {
   const [pwMsg, setPwMsg]           = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [weeklyProgress, setWeeklyProgress] = useState(null);
+  const [aiUnavailable, setAiUnavailable] = useState(false);
 
   const chatEndRef         = useRef(null);
   const abortControllerRef = useRef(null);
@@ -211,6 +212,11 @@ export default function Dashboard() {
           }), { quizzes: 0, weaknesses: 0, xp: 0, minutes: 0 });
           setWeeklyProgress(totals);
         })
+        .catch(() => {}),
+      // Check AI availability
+      apiFetch(`${API_URL}/health`)
+        .then(r => r.json())
+        .then(d => setAiUnavailable(d.groq !== "ok"))
         .catch(() => {})
     ]);
 
@@ -1002,6 +1008,12 @@ export default function Dashboard() {
               xpData={xpData}
               streakData={streakData}
             />
+
+            {aiUnavailable && (
+              <div className="mx-4 mb-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-2">
+                <span className="text-xs font-semibold text-red-400">⚠️ AI service is temporarily unavailable. Responses may fail.</span>
+              </div>
+            )}
 
             {weeklyProgress && (weeklyProgress.quizzes > 0 || weeklyProgress.xp > 0) && (
               <div className="mx-4 mt-2 px-4 py-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center gap-3 flex-wrap">

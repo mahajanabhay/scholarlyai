@@ -76,8 +76,13 @@ app.include_router(knowledge_routes.router)
 
 @app.get("/health")
 async def health_check():
+    import asyncio
     from backend.db import get_connection, release_connection, connection_pool
-    status = {"api": "ok", "db": "error", "pool_available": 0}
+    from backend.core.llm import client, LLM_MODEL
+
+    status = {"api": "ok", "db": "error", "groq": "error", "pool_available": 0}
+
+    # Check DB
     try:
         conn = get_connection()
         cur = conn.cursor()
@@ -87,4 +92,19 @@ async def health_check():
         status["pool_available"] = connection_pool.maxconn - len(connection_pool._used)
     except Exception as e:
         status["db_error"] = str(e)
+
+    # Check Groq
+    try:
+        def _ping():
+            return client.chat.completions.create(
+                model=LLM_MODEL,
+                messages=[{"role": "user", "content": "ping"}],
+                max_tokens=1,
+                timeout=5.0,
+            )
+        await asyncio.wait_for(asyncio.to_thread(_ping), timeout=6.0)
+        status["groq"] = "ok"
+    except Exception as e:
+        status["groq_error"] = str(e)[:100]
+
     return status
