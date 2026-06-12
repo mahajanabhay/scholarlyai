@@ -75,7 +75,6 @@ function persistSession(data: {
   bio: string;
   subject_focus: string[];
 }): User {
-  localStorage.setItem('scholarly_token', data.token);
   localStorage.setItem('scholarly_user_id', data.user_id);
   localStorage.setItem('scholarly_email', data.email);
   localStorage.setItem('scholarly_name', data.name);
@@ -104,57 +103,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const refreshIfNeeded = async (token: string) => {
-  const payload = JSON.parse(atob(token.split(".")[1]));
-  const expiresIn = payload.exp * 1000 - Date.now();
-  if (expiresIn < 2 * 24 * 60 * 60 * 1000) {
-    const res = await fetch(`${API_URL}/auth/refresh`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.token) localStorage.setItem("scholarly_token", data.token);
-    }
-  }
-};
 
 
   // On mount: verify any stored token against /auth/check
   useEffect(() => {
-    const token = localStorage.getItem('scholarly_token');
     const userId = localStorage.getItem('scholarly_user_id');
+    if (!userId) { setIsLoading(false); return; }
 
-    if (!token || !userId) {
-      setIsLoading(false);
-      return;
-    }
-
-    fetch(`${API_URL}/auth/check/${userId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => {
-        if (res.ok) return res.json();
-        // Token expired or invalid — wipe stale credentials
-        clearSession();
-        return null;
-      })
-      .then((data) => {
+    fetch(`${API_URL}/auth/check/${userId}`, { credentials: "include" })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
         if (data?.valid) {
-          setUser({
-            id: data.user_id,
-            email: data.email,
-            name: data.name,
-            avatar: data.avatar ?? '🎓',
-            bio: data.bio ?? '',
-            subject_focus: [],
-          });
-          refreshIfNeeded(token);
+          setUser({ id: data.user_id, email: data.email, name: data.name,
+            avatar: data.avatar ?? '🎓', bio: data.bio ?? '', subject_focus: [] });
+        } else {
+          localStorage.removeItem('scholarly_user_id');
         }
       })
       .catch(() => {
-        // Network error on startup — restore from localStorage so offline
-        // users aren't locked out. page.js will re-validate on next load.
         const name = localStorage.getItem('scholarly_name') ?? '';
         const email = localStorage.getItem('scholarly_email') ?? '';
         setUser({ id: userId, email, name, avatar: '🎓', bio: '', subject_focus: [] });
@@ -169,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const res = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
+      credentials: "include",
       body: fd,
     });
     
@@ -194,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const res = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
+      credentials: "include",
       body: fd,
     });
 

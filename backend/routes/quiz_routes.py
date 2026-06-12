@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from backend.core.config import MAX_TOKENS
 from backend.core.llm import client, LLM_MODEL
 import re
@@ -519,10 +520,13 @@ async def quiz_endpoint(
         except Exception:
             pass
 
+        is_correct = not any(w in feedback.lower() for w in ["incorrect", "wrong", "not correct"]) if feedback else None
+
         return {
             "feedback":        feedback,
             "new_question":    new_question,
             "question_number": question_number,
+            "is_correct":      is_correct,
             "quiz_type":       "single",
             "is_paper_start":  False,
             "topic_expanded":  quiz_mem['quiz_topic'],
@@ -610,3 +614,7 @@ async def reset_quiz_endpoint(
 ):
     reset_quiz_memory(session_id)
     return {"status": "quiz_memory_cleared"}
+
+@router.post("/quiz/session")
+async def create_quiz_session(current_user=Depends(get_current_user)):
+    return {"session_id": str(uuid.uuid4())}

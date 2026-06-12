@@ -14,6 +14,7 @@ router = APIRouter()
 @limiter.limit("10/minute")
 async def login(
     request: Request,
+    response: Response,
     email: str = Form(...),
     password: str = Form(...)
 ):
@@ -43,7 +44,7 @@ async def login(
     except Exception:
         pass
 
-    return {
+    data = {
         "status":        "authenticated",
         "user_id":       user_id,
         "token":         token,
@@ -53,12 +54,22 @@ async def login(
         "bio":           user.bio,
         "subject_focus": user.subject_focus,
     }
+    response.set_cookie(
+        key="scholarly_token",
+        value=token,
+        httponly=True,
+        secure=False,   # set True in production (HTTPS)
+        samesite="lax",
+        max_age=60 * 60 * 24 * 7
+    )
+    return data
 
 
 @router.post("/auth/register")
 @limiter.limit("5/minute")
 async def register(
     request: Request,
+    response: Response,
     email:    str = Form(...),
     password: str = Form(...),
     name:     str = Form(...),
@@ -75,7 +86,7 @@ async def register(
         raise HTTPException(status_code=500, detail="User ID lookup failed after successful registration")
     token   = create_token(user_id, email)
 
-    return {
+    data = {
         "status":        "registered",
         "user_id":       user_id,
         "token":         token,
@@ -85,6 +96,15 @@ async def register(
         "bio":           "",
         "subject_focus": [],
     }
+    response.set_cookie(
+        key="scholarly_token",
+        value=token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 7
+    )
+    return data
 
 
 @router.get("/auth/check/{user_id}")

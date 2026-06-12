@@ -16,6 +16,7 @@ export function getAuthHeaders() {
 export async function apiFetch(url, options = {}) {
   const res = await fetch(url, {
     ...options,
+    credentials: "include",
     headers: {
       ...getAuthHeaders(),
       ...(options.headers || {}),
@@ -23,10 +24,6 @@ export async function apiFetch(url, options = {}) {
   });
 
   if (res.status === 401) {
-    localStorage.removeItem("scholarly_token");
-    localStorage.removeItem("scholarly_user_id");
-    localStorage.removeItem("scholarly_email");
-    localStorage.removeItem("scholarly_name");
     window.location.replace("/login");
     // Return a never-resolving promise so callers don't process a 401 body
     return new Promise(() => {});

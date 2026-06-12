@@ -40,10 +40,23 @@ def verify_token(token: str) -> dict:
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token. Please log in again.")
 
-bearer_scheme = HTTPBearer()
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> dict:
+bearer_scheme = HTTPBearer(auto_error=False)
+
+def get_current_user(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme)
+) -> dict:
     """
-    FastAPI dependency — extracts and verifies the Bearer token.
+    Accepts token from httpOnly cookie OR Authorization header (fallback).
     """
-    token = credentials.credentials
+    # 1. Try httpOnly cookie first
+    token = request.cookies.get("scholarly_token")
+
+    # 2. Fall back to Bearer header
+    if not token and credentials:
+        token = credentials.credentials
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+
     return verify_token(token)

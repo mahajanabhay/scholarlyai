@@ -20,7 +20,7 @@ export default function StudySessionModal({ userId, onClose, onStartQuiz }) {
   const [feedbacks, setFeedbacks]     = useState([]);
   const [currentQ, setCurrentQ]       = useState(0);
   const [loading, setLoading]         = useState(false);
-  const [sessionId]                   = useState('study_' + Date.now());
+  const [sessionId, setSessionId] = useState(null);
   const [score, setScore]             = useState(0);
   const [weakTopics, setWeakTopics]   = useState([]);
   const TOTAL = 5;
@@ -31,15 +31,19 @@ export default function StudySessionModal({ userId, onClose, onStartQuiz }) {
     if (!finalSubject) return;
     setLoading(true);
     setStep('running');
-    // Kick off first question via quiz API
-    await fetchNextQuestion(null, null, 1, true);
+    const res = await fetch(`${API_URL}/quiz/session`, {
+      method: 'POST', headers: getAuthHeaders()
+    });
+    const { session_id } = await res.json();
+    setSessionId(session_id);
+    await fetchNextQuestion(null, null, 1, true, session_id);
     setLoading(false);
   };
 
-  const fetchNextQuestion = async (prevAnswer, prevQ, qNum, isStart) => {
+  const fetchNextQuestion = async (prevAnswer, prevQ, qNum, isStart, sid = sessionId) => {
     const fd = new FormData();
     fd.append('message',         isStart ? finalSubject : prevAnswer);
-    fd.append('session_id',      sessionId);
+    fd.append('session_id', sid);
     fd.append('mode',            'QUIZ');
     fd.append('quiz_type',       'single');
     fd.append('question_number', qNum);
@@ -75,7 +79,7 @@ export default function StudySessionModal({ userId, onClose, onStartQuiz }) {
     const newFeedbacks = [...feedbacks, fb];
     setFeedbacks(newFeedbacks);
 
-    const wrong = fb.toLowerCase().includes('incorrect') || fb.toLowerCase().includes('wrong') || fb.toLowerCase().includes('not correct');
+    const wrong = data.is_correct === false;
     if (wrong) setWeakTopics(prev => [...prev, finalSubject]);
 
     if (currentQ + 1 < TOTAL) {
@@ -215,12 +219,12 @@ export default function StudySessionModal({ userId, onClose, onStartQuiz }) {
                 <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Question Breakdown</p>
                 {questions.slice(0, TOTAL).map((q, i) => {
                   const fb = feedbacks[i] || '';
-                  const wrong = fb.toLowerCase().includes('incorrect') || fb.toLowerCase().includes('wrong') || fb.toLowerCase().includes('not correct');
+                  const wrong = data.is_correct === false;
                   const qParsed = parseQuestion(q);
                   return (
                     <div key={i} className={`p-3 rounded-xl border text-xs ${wrong ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20' : 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20'}`}>
                       <div className="flex items-start gap-2">
-                        <span className="flex-shrink-0 mt-0.5">{wrong ? '❌' : '✅'}</span>
+                        <span className="shrink-0 mt-0.5">{wrong ? '❌' : '✅'}</span>
                         <div>
                           <p className="font-medium text-zinc-800 dark:text-zinc-200 leading-snug">{qParsed.text}</p>
                           {fb && <p className="text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">{fb.slice(0, 180)}{fb.length > 180 ? '…' : ''}</p>}

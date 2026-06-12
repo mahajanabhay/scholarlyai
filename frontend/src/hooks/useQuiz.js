@@ -42,8 +42,7 @@ export function useQuiz({ userId, currentSessionId, sessions, setSessions, award
       if (!res.ok) throw new Error(`Quiz error ${res.status}`);
       const data = await res.json();
 
-      const feedbackLower = (data.feedback || '').toLowerCase();
-      const wasWrong = feedbackLower.includes('incorrect') || feedbackLower.includes('wrong') || feedbackLower.includes('not correct');
+      const wasWrong = data.is_correct === false;
       setLastFeedbackWrong(wasWrong);
 
       if (data.feedback) {

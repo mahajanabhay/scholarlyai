@@ -425,7 +425,6 @@ export default function Dashboard() {
 
       // Award XP per quiz question answered
       await awardXp(wasWrong ? 5 : 15);
-      refreshNotifications();
 
     } catch (error) {
       console.error("Quiz error:", error);
