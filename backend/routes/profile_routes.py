@@ -29,6 +29,21 @@ async def get_profile_endpoint(user_id: str, current_user: dict = Depends(get_cu
     return get_profile(user_id)
 
 
+import re as _re
+
+# Allowed emoji pattern — basic unicode emoji ranges
+_EMOJI_RE = _re.compile(
+    "[\U0001F300-\U0001F9FF\U00002600-\U000027BF\U0001FA00-\U0001FA9F"
+    "\U0001F600-\U0001F64F\U0001F680-\U0001F6FF\U00002702-\U000027B0]"
+)
+
+def _sanitise_text(value: str, max_len: int) -> str:
+    """Strip leading/trailing whitespace, collapse internal whitespace, enforce max length."""
+    value = value.strip()
+    value = _re.sub(r"\s+", " ", value)
+    return value[:max_len]
+
+
 @router.post("/profile/{user_id}")
 async def update_profile_endpoint(
     user_id: str,
@@ -40,6 +55,19 @@ async def update_profile_endpoint(
 ):
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
+
+    # Validate inputs
+    if name is not None:
+        name = _sanitise_text(name, 100)
+        if not name:
+            raise HTTPException(status_code=400, detail="Name cannot be empty.")
+    if bio is not None:
+        bio = _sanitise_text(bio, 500)
+    if avatar is not None:
+        avatar = avatar.strip()
+        if len(avatar) > 10:
+            raise HTTPException(status_code=400, detail="Avatar must be a single emoji.")
+
     profile = get_profile(user_id)
     if name is not None:
         profile["name"] = name
@@ -49,11 +77,12 @@ async def update_profile_endpoint(
         profile["bio"] = bio
     if subject_focus is not None:
         try:
-            profile["subject_focus"] = json.loads(subject_focus)
+            parsed = json.loads(subject_focus)
+            if isinstance(parsed, list):
+                profile["subject_focus"] = [_sanitise_text(str(s), 50) for s in parsed[:20]]
         except Exception:
             pass
 
-    # Persist to DB
     from backend.db import get_connection, release_connection
     conn = get_connection()
     try:
@@ -94,6 +123,8 @@ async def clear_weakness_endpoint(user_id: str, topic: Optional[str] = Form(None
 # ── Streak System ─────────────────────────────
 @router.get("/streak/{user_id}")
 async def get_streak_endpoint(user_id: str, current_user: dict = Depends(get_current_user)):
+    if user_id != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access forbidden.")
     return get_streak(current_user["user_id"])
 
 @router.post("/streak/{user_id}/touch")
