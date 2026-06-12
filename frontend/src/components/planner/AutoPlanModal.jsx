@@ -77,7 +77,7 @@ export function AutoPlanModal({ userId, onClose, onXpUpdate }) {
     const nowDone = !checked[task.id];
     setChecked(prev => ({ ...prev, [task.id]: nowDone }));
     if (nowDone) {
-      const fd = new FormData(); fd.append('amount', 20);
+      const fd = new FormData(); fd.append('action', 'task_complete');
       const r = await apiFetch(`${API_URL}/xp/${userId}/add`, { method: 'POST', body: fd });
       const d = await r.json();
       onXpUpdate(d);

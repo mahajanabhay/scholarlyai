@@ -1675,7 +1675,7 @@ export default function Dashboard() {
                   const fd = new FormData();
                   fd.append('email', forgotEmail);
                   try {
-                    const r = await fetch(`${API_URL}/auth/forgot-password`, { method: 'POST', body: fd });
+                    const r = await apiFetch(`${API_URL}/auth/forgot-password`, { method: 'POST', body: fd });
                     const d = await r.json();
                     setForgotMsg({ ok: true, text: d.status });
                   } catch {
