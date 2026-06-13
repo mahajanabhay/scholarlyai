@@ -665,6 +665,8 @@ async def change_password(
             (hash_password(new_password), current_user["user_id"])
         )
         conn.commit()
+        from backend.services.audit_service import audit
+        audit(current_user["user_id"], "password_changed", "via settings")
         return {"status": "password updated"}
     finally:
         release_connection(conn)
@@ -711,3 +713,29 @@ async def trigger_daily_notifications(current_user: dict = Depends(get_current_u
     from backend.services.notification_scheduler import schedule_daily_notifications
     schedule_daily_notifications()
     return {"status": "notifications sent"}
+
+@router.get("/admin/audit-log")
+async def get_audit_log(
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user)
+):
+    from backend.db import get_connection, release_connection
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT is_admin FROM users WHERE id = %s", (current_user["user_id"],))
+        row = cur.fetchone()
+        if not row or not row[0]:
+            raise HTTPException(status_code=403, detail="Admin only.")
+        cur.execute(
+            """SELECT user_id, action, detail, ip, created_at
+               FROM audit_log ORDER BY created_at DESC LIMIT %s""",
+            (limit,)
+        )
+        rows = cur.fetchall()
+        return {"logs": [
+            {"user_id": r[0], "action": r[1], "detail": r[2], "ip": r[3], "created_at": str(r[4])}
+            for r in rows
+        ]}
+    finally:
+        release_connection(conn)

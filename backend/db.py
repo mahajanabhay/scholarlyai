@@ -215,6 +215,22 @@ def init_db():
         """)
 
         cursor.execute("""
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id         SERIAL PRIMARY KEY,
+            user_id    TEXT,
+            action     TEXT NOT NULL,
+            detail     TEXT,
+            ip         TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_audit_log_user
+            ON audit_log (user_id, created_at DESC)
+        """)
+
+        cursor.execute("""
         CREATE TABLE IF NOT EXISTS login_attempts (
             id         SERIAL PRIMARY KEY,
             email      TEXT NOT NULL,

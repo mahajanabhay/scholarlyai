@@ -6,6 +6,7 @@ from backend.auth import User, authenticate_user, get_email_from_user_id, get_us
 from backend.core.jwt_auth import create_token, get_current_user
 from backend.core.limiter import limiter
 from backend.services.memory_service import get_streak, push_notification
+from backend.services.audit_service import audit
 
 router = APIRouter()
 
@@ -63,7 +64,10 @@ async def login(
     _record_attempt(email, ip, success)
 
     if not success:
+        audit(None, "login_failed", f"email={email}", ip)
         raise HTTPException(status_code=401, detail=message)
+
+    audit(user_id, "login_success", f"email={email}", ip)
 
     user_id = get_user_id_from_email(email)
     if not user_id:
@@ -121,7 +125,8 @@ async def register(
 
     if not success:
         raise HTTPException(status_code=400, detail=message)
-
+    
+    audit(None, "register_success", f"email={email}")
     user_id = get_user_id_from_email(email)
     if not user_id:
         raise HTTPException(status_code=500, detail="User ID lookup failed after successful registration")
@@ -305,6 +310,7 @@ async def reset_password(
             (hash_password(new_password), row[0])
         )
         conn.commit()
+        audit(row[0], "password_reset", "via reset token")
         return {"status": "Password reset successfully."}
     finally:
         release_connection(conn)
