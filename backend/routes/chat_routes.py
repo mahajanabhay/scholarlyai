@@ -337,7 +337,18 @@ async def chat_endpoint(
                 continue
 
             if file.filename.lower().endswith(".pdf"):
-                pdf_reader = PdfReader(io.BytesIO(content))
+                # Validate PDF magic bytes — reject files masquerading as PDFs
+                if not content.startswith(b"%PDF"):
+                    print(f"❌ Rejected fake PDF: {file.filename}")
+                    continue
+                # Reject suspiciously small or large files
+                if len(content) < 100:
+                    continue
+                try:
+                    pdf_reader = PdfReader(io.BytesIO(content))
+                except Exception:
+                    print(f"❌ Corrupt PDF rejected: {file.filename}")
+                    continue
                 if not pdf_reader.pages:
                     continue
 

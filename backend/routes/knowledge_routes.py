@@ -35,19 +35,33 @@ async def upload_document(
     file: UploadFile = File(...),
     current_user: dict = Depends(require_admin)
 ):
-    if not file.filename.endswith(".pdf"):
+    if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
-    save_path = os.path.join(UPLOAD_DIR, file.filename)
+    # Enforce size limit (20MB)
+    content = await file.read()
+    if len(content) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File exceeds 20MB limit.")
+
+    # Validate PDF magic bytes
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="Invalid PDF file.")
+
+    # Sanitise filename — strip path traversal
+    safe_name = os.path.basename(file.filename).replace(" ", "_")
+    if not safe_name or safe_name.startswith("."):
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+
+    save_path = os.path.join(UPLOAD_DIR, safe_name)
     with open(save_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+        f.write(content)
 
     try:
         ingest_pdfs(UPLOAD_DIR, SHARED_SESSION)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {e}")
 
-    return {"status": "ingested", "filename": file.filename}
+    return {"status": "ingested", "filename": safe_name}
 
 
 @router.get("/knowledge/documents")
