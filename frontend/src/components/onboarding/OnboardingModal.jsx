@@ -30,6 +30,7 @@ export default function OnboardingModal({ userId, onComplete, apiFetch }) {
       // Mark onboarding complete
       await apiFetch(`${API_URL}/profile/${userId}/onboarding-complete`, { method: "POST" });
       onComplete(selected, topic);
+      trackEvent(Events.ONBOARDING_DONE, { subjects: selected.length });
     } catch (e) {
       console.error(e);
     } finally {

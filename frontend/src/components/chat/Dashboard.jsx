@@ -35,6 +35,7 @@ import PomodoroTimer from "@/components/common/PomodoroTimer";
 import { API_URL, getAuthHeaders, apiFetch } from "@/lib/api";
 import { useQuiz } from "@/hooks/useQuiz";
 import { SUBJECTS } from "@/lib/constants";
+import { trackEvent, Events } from "@/lib/analytics";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -425,6 +426,7 @@ export default function Dashboard() {
 
       // Award XP per quiz question answered
       await awardXp(wasWrong ? "message_sent" : "quiz_correct");
+      trackEvent(Events.QUIZ_COMPLETED, { correct: !wasWrong });
 
     } catch (error) {
       console.error("Quiz error:", error);
@@ -647,6 +649,7 @@ export default function Dashboard() {
 
         // Award XP for chat messages
         await awardXp("message_sent");
+        trackEvent(Events.CHAT_MESSAGE, { mode });
       }
     } catch (error) {
       console.error("Send error:", error);
