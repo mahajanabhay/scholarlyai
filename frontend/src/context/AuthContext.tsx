@@ -105,10 +105,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
 
+  const refreshIfNeeded = async (token: string) => {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expiresIn = payload.exp * 1000 - Date.now();
+      if (expiresIn < 2 * 24 * 60 * 60 * 1000) {
+        const res = await fetch(`${API_URL}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.token) {
+            localStorage.setItem('scholarly_token', data.token);
+          }
+        } else {
+          clearSession();
+          window.location.href = '/login';
+        }
+      }
+    } catch {
+      // Malformed token — ignore
+    }
+  };
+
   // On mount: verify any stored token against /auth/check
   useEffect(() => {
     const userId = localStorage.getItem('scholarly_user_id');
+    const token  = localStorage.getItem('scholarly_token');
     if (!userId) { setIsLoading(false); return; }
+    if (token) refreshIfNeeded(token);
 
     fetch(`${API_URL}/auth/check/${userId}`, { credentials: "include" })
       .then(res => res.ok ? res.json() : null)
@@ -146,6 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await res.json();
+    if (data.token) localStorage.setItem('scholarly_token', data.token);
     setUser(persistSession(data));
   };
 
@@ -171,6 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await res.json();
+    if (data.token) localStorage.setItem('scholarly_token', data.token);
     setUser(persistSession(data));
   };
 

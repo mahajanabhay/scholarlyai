@@ -173,9 +173,20 @@ async def check_auth(
     }
 
 @router.post("/auth/refresh")
-async def refresh_token(current_user: dict = Depends(get_current_user)):
-    """Issue a fresh token using the existing valid token."""
+async def refresh_token(
+    response: Response,
+    current_user: dict = Depends(get_current_user)
+):
+    """Issue a fresh token and rotate — old token is implicitly invalidated."""
     new_token = create_token(current_user["user_id"], current_user["email"])
+    response.set_cookie(
+        key="scholarly_token",
+        value=new_token,
+        httponly=True,
+        secure=False,  # set True in production
+        samesite="lax",
+        max_age=60 * 60 * 24 * 7
+    )
     return {"token": new_token}
 
 @router.get("/auth/verify-email")
