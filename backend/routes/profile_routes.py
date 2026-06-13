@@ -695,3 +695,19 @@ async def get_progress(user_id: str, current_user: dict = Depends(get_current_us
         raise HTTPException(status_code=403, detail="Access forbidden.")
     from backend.db import get_weekly_progress
     return {"progress": get_weekly_progress(user_id)}
+
+@router.post("/admin/notify/daily")
+async def trigger_daily_notifications(current_user: dict = Depends(get_current_user)):
+    from backend.db import get_connection, release_connection
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT is_admin FROM users WHERE id = %s", (current_user["user_id"],))
+        row = cur.fetchone()
+        if not row or not row[0]:
+            raise HTTPException(status_code=403, detail="Admin only.")
+    finally:
+        release_connection(conn)
+    from backend.services.notification_scheduler import schedule_daily_notifications
+    schedule_daily_notifications()
+    return {"status": "notifications sent"}

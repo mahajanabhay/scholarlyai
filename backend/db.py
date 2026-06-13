@@ -215,6 +215,21 @@ def init_db():
         """)
 
         cursor.execute("""
+        CREATE TABLE IF NOT EXISTS login_attempts (
+            id         SERIAL PRIMARY KEY,
+            email      TEXT NOT NULL,
+            ip         TEXT NOT NULL,
+            success    BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_login_attempts_email_time
+            ON login_attempts (email, created_at DESC)
+        """)
+
+        cursor.execute("""
         CREATE TABLE IF NOT EXISTS user_notifications (
             user_id    TEXT PRIMARY KEY,
             data       TEXT DEFAULT '[]',

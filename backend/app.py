@@ -28,6 +28,20 @@ async def lifespan(app: FastAPI):
     # Startup
     init_db()
 
+    # Start daily notification scheduler (runs every 6 hours)
+    import asyncio as _asyncio
+
+    async def _notification_loop():
+        while True:
+            try:
+                from backend.services.notification_scheduler import schedule_daily_notifications
+                await _asyncio.to_thread(schedule_daily_notifications)
+            except Exception as e:
+                print(f"⚠️ Notification scheduler error: {e}")
+            await _asyncio.sleep(6 * 60 * 60)  # every 6 hours
+
+    _asyncio.create_task(_notification_loop())
+
     try:
         from backend.services.vector_service import get_or_create_collection
         from backend.ingest import ingest_pdfs
