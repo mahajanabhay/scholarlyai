@@ -602,26 +602,74 @@ export default function Dashboard() {
           [currentId]: [...(prev[currentId] || []), { role: "assistant", content: "", id: "streaming" }],
         }));
 
-        const fetchStream = async (fd) => {
-          const res = await apiFetch(`${API_URL}/chat`, {
-            method: "POST",
-            body: fd,
-            signal: controller.signal,
-          });
+        const fetchStream = async (fd, retryCount = 0) => {
+          const MAX_RETRIES = 2;
+          const STREAM_TIMEOUT_MS = 15000; // 15s of silence before retry
+
+          let res;
+          try {
+            res = await apiFetch(`${API_URL}/chat`, {
+              method: "POST",
+              body: fd,
+              signal: controller.signal,
+            });
+          } catch (err) {
+            if (err.name === "AbortError") throw err;
+            if (retryCount < MAX_RETRIES) {
+              console.warn(`[stream] fetch failed, retrying (${retryCount + 1}/${MAX_RETRIES})...`);
+              await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
+              return fetchStream(fd, retryCount + 1);
+            }
+            throw err;
+          }
+
           if (!res.ok || !res.body) {
             const errText = await res.text().catch(() => res.statusText);
             throw new Error(`Server error ${res.status}: ${errText}`);
           }
+
           const reader = res.body.getReader();
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            botResponse += decoder.decode(value);
-            setSessions(prev => {
-              const chat = [...(prev[currentId] || [])];
-              chat[chat.length - 1] = { role: "assistant", content: botResponse, id: "streaming" };
-              return { ...prev, [currentId]: chat };
-            });
+          let silenceTimer;
+
+          const resetSilenceTimer = () => {
+            clearTimeout(silenceTimer);
+            silenceTimer = setTimeout(async () => {
+              reader.cancel();
+              if (retryCount < MAX_RETRIES && botResponse.length > 0) {
+                console.warn("[stream] silence timeout — reconnecting...");
+                setSessions(prev => {
+                  const chat = [...(prev[currentId] || [])];
+                  chat[chat.length - 1] = { role: "assistant", content: botResponse + "\n\n_Reconnecting..._", id: "streaming" };
+                  return { ...prev, [currentId]: chat };
+                });
+                const contForm = new FormData();
+                contForm.append("message", "continue from exactly where you left off, no preamble");
+                contForm.append("session_id", `${userId}_${currentId}`);
+                contForm.append("mode", mode);
+                contForm.append("history", JSON.stringify([
+                  ...(sessions[currentId] || []).slice(-20),
+                  { role: "assistant", content: botResponse },
+                ]));
+                await fetchStream(contForm, retryCount + 1);
+              }
+            }, STREAM_TIMEOUT_MS);
+          };
+
+          try {
+            resetSilenceTimer();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) { clearTimeout(silenceTimer); break; }
+              resetSilenceTimer();
+              botResponse += decoder.decode(value);
+              setSessions(prev => {
+                const chat = [...(prev[currentId] || [])];
+                chat[chat.length - 1] = { role: "assistant", content: botResponse, id: "streaming" };
+                return { ...prev, [currentId]: chat };
+              });
+            }
+          } finally {
+            clearTimeout(silenceTimer);
           }
         };
 
