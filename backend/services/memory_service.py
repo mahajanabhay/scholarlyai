@@ -294,6 +294,8 @@ def get_notifications(user_id: str) -> list:
     return _notifications[user_id]
 
 
+MAX_NOTIFICATIONS = 50
+
 def push_notification(user_id: str, message: str, notif_type: str = "info"):
     ns = get_notifications(user_id)
     ns.append({
@@ -302,7 +304,8 @@ def push_notification(user_id: str, message: str, notif_type: str = "info"):
         "timestamp": datetime.utcnow().isoformat(),
         "read":      False,
     })
-    _notifications[user_id] = ns[-20:]
+    # Archive old read notifications, keep last MAX_NOTIFICATIONS total
+    _notifications[user_id] = ns[-MAX_NOTIFICATIONS:]
     try:
         upsert_notifications(user_id, _notifications[user_id])
     except Exception as e:

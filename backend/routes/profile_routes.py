@@ -555,8 +555,24 @@ async def generate_daily_plan_endpoint(user_id: str, session_id: Optional[str] =
 
 # ── Smart Notifications ───────────────────────
 @router.get("/notifications/{user_id}")
-async def get_notifications_endpoint(user_id: str, current_user: dict = Depends(get_current_user)):
-    return {"notifications": get_notifications(user_id)}
+async def get_notifications_endpoint(
+    user_id: str,
+    limit:  int = 20,
+    offset: int = 0,
+    current_user: dict = Depends(get_current_user)
+):
+    if user_id != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access forbidden.")
+    all_notifs = get_notifications(user_id)
+    # Newest first, paginated
+    paginated  = list(reversed(all_notifs))[offset:offset + limit]
+    return {
+        "notifications": paginated,
+        "total":         len(all_notifs),
+        "limit":         limit,
+        "offset":        offset,
+        "has_more":      (offset + limit) < len(all_notifs),
+    }
 
 @router.post("/notifications/{user_id}/read")
 async def mark_all_read_endpoint(user_id: str, current_user: dict = Depends(get_current_user)):

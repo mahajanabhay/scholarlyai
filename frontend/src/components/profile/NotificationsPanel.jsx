@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from 'react';
 import { Bell, CheckCircle2, AlertTriangle, X } from 'lucide-react';
-import { getAuthHeaders } from '@/lib/api';
+import { apiFetch, getAuthHeaders } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -11,7 +11,7 @@ export default function NotificationsPanel({ userId, onClose, onRead }) {
   const panelRef = useRef(null);
 
   useEffect(() => {
-    fetch(`${API_URL}/notifications/${userId}`, { headers: getAuthHeaders() })
+    apiFetch(`${API_URL}/notifications/${userId}?limit=20&offset=0`)
       .then(r => r.json())
       .then(d => { setNotifications((d.notifications || []).reverse()); setLoading(false); })
       .catch(() => setLoading(false));
