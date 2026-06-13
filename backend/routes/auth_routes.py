@@ -10,16 +10,57 @@ from backend.services.memory_service import get_streak, push_notification
 router = APIRouter()
 
 
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_MINUTES     = 15
+
+def _check_brute_force(email: str, ip: str) -> bool:
+    """Returns True if account is locked out."""
+    from backend.db import get_connection, release_connection
+    from datetime import datetime, timedelta
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT COUNT(*) FROM login_attempts
+               WHERE email = %s AND ip = %s AND success = FALSE
+               AND created_at > %s""",
+            (email.lower(), ip, datetime.utcnow() - timedelta(minutes=LOCKOUT_MINUTES))
+        )
+        return cur.fetchone()[0] >= MAX_FAILED_ATTEMPTS
+    finally:
+        release_connection(conn)
+
+
+def _record_attempt(email: str, ip: str, success: bool):
+    from backend.db import get_connection, release_connection
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO login_attempts (email, ip, success) VALUES (%s, %s, %s)",
+            (email.lower(), ip, success)
+        )
+        conn.commit()
+    finally:
+        release_connection(conn)
+
+
 @router.post("/auth/login")
 @limiter.limit("10/minute")
 async def login(
-    request: Request,
+    request:  Request,
     response: Response,
-    email: str = Form(...),
-    password: str = Form(...)
+    email:    str = Form(...),
+    password: str = Form(...),
 ):
     """Login user — max 10 attempts per minute per IP"""
+    ip = request.client.host if request.client else "unknown"
+
+    if _check_brute_force(email, ip):
+        raise HTTPException(status_code=429, detail=f"Too many failed attempts. Account locked for {LOCKOUT_MINUTES} minutes.")
+
     success, message, user = await asyncio.to_thread(authenticate_user, email, password)
+    _record_attempt(email, ip, success)
 
     if not success:
         raise HTTPException(status_code=401, detail=message)
