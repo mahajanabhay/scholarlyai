@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 
 from backend.core.config import ALLOWED_ORIGINS, GROQ_API_KEY, LLM_MODEL
 from backend.db import init_db
-from backend.routes import auth_routes, profile_routes, chat_routes, quiz_routes, study_routes, knowledge_routes
+from backend.routes import auth_routes, profile_routes, chat_routes, quiz_routes, study_routes, knowledge_routes, referral_routes
 
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
@@ -87,6 +87,7 @@ app.include_router(chat_routes.router)
 app.include_router(quiz_routes.router)
 app.include_router(study_routes.router)
 app.include_router(knowledge_routes.router)
+app.include_router(referral_routes.router)
 
 @app.get("/health")
 async def health_check():

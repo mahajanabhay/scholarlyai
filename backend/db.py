@@ -278,6 +278,19 @@ def init_db():
         )
         """)
 
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS referrals (
+            id            SERIAL PRIMARY KEY,
+            referrer_id   TEXT NOT NULL,
+            referred_id   TEXT,
+            code          TEXT UNIQUE NOT NULL,
+            used          BOOLEAN DEFAULT FALSE,
+            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            used_at       TIMESTAMP,
+            FOREIGN KEY (referrer_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """)
+
         conn.commit()
 
         conn.commit()

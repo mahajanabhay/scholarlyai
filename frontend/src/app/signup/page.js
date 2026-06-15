@@ -5,6 +5,12 @@ import Link from "next/link";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// Extract referral code from URL
+const getReferralCode = () => {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("ref") || "";
+};
+
 export default function SignupPage() {
   const router = useRouter();
   const [name, setName]         = useState("");
@@ -26,7 +32,9 @@ export default function SignupPage() {
     fd.append("email", email);
     fd.append("password", password);
     try {
-      const r = await fetch(`${API_URL}/auth/register`, { method: "POST", body: fd });
+      const refCode = getReferralCode();
+      const url = refCode ? `${API_URL}/auth/register?ref=${refCode}` : `${API_URL}/auth/register`;
+      const r = await fetch(url, { method: "POST", body: fd });
       const d = await r.json();
       if (!r.ok) { setError(d.detail || "Registration failed."); return; }
       setSuccess(true);
