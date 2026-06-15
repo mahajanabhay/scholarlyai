@@ -414,7 +414,8 @@ def load_weaknesses_from_db(user_id: str) -> list | None:
         cursor = conn.cursor()
         cursor.execute("SELECT data FROM user_weaknesses WHERE user_id = %s", (user_id,))
         row = cursor.fetchone()
-        return _json.loads(row[0]) if row else None
+        if not row: return None
+        return row[0] if isinstance(row[0], list) else _json.loads(row[0])
     except Exception as e:
         print(f"⚠️ Failed to load weaknesses for {user_id}: {e}")
         return None
@@ -451,7 +452,8 @@ def load_planner_from_db(user_id: str) -> list | None:
         cursor = conn.cursor()
         cursor.execute("SELECT data FROM user_planners WHERE user_id = %s", (user_id,))
         row = cursor.fetchone()
-        return _json.loads(row[0]) if row else None
+        if not row: return None
+        return row[0] if isinstance(row[0], list) else _json.loads(row[0])
     except Exception as e:
         print(f"⚠️ Failed to load planner for {user_id}: {e}")
         return None
@@ -526,7 +528,8 @@ def load_notifications_from_db(user_id: str) -> list | None:
         cursor = conn.cursor()
         cursor.execute("SELECT data FROM user_notifications WHERE user_id = %s", (user_id,))
         row = cursor.fetchone()
-        return _json.loads(row[0]) if row else None
+        if not row: return None
+        return row[0] if isinstance(row[0], list) else _json.loads(row[0])
     except Exception as e:
         print(f"⚠️ Failed to load notifications for {user_id}: {e}")
         return None

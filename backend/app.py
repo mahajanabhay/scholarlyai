@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
     _asyncio.create_task(_notification_loop())
 
     try:
-        from backend.services.vector_service import get_or_create_collection
+        from backend.services.vector_service import get_vector_db as get_or_create_collection
         from backend.ingest import ingest_pdfs
         import glob
 
