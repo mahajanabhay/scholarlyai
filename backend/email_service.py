@@ -2,15 +2,9 @@
 Email Service — sends verification emails via SMTP
 """
 import smtplib
-import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-
-SMTP_HOST     = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER     = os.getenv("SMTP_USER", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-APP_URL       = os.getenv("APP_URL", "http://localhost:3000")
+from backend.core.config import SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, APP_URL
 
 
 def send_verification_email(to_email: str, name: str, token: str) -> bool:

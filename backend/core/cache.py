@@ -5,9 +5,8 @@ Falls back to a plain dict if Redis is unavailable (dev/test environments).
 import os
 import json
 import redis
-
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-TTL = int(os.getenv("CACHE_TTL_SECONDS", "300"))  # 5 minutes default
+from backend.core.config import REDIS_URL, CACHE_TTL
+TTL = CACHE_TTL
 
 try:
     _client = redis.Redis.from_url(REDIS_URL, decode_responses=True, socket_connect_timeout=2)

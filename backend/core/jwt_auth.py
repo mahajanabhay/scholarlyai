@@ -3,20 +3,15 @@ JWT Authentication Utility
 Handles token creation and verification
 """
 import jwt
-import os
 from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException, Header
 from typing import Optional
-from dotenv import load_dotenv
 from fastapi import Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from backend.core.config import JWT_SECRET
 
-load_dotenv()
-
-SECRET_KEY = os.getenv("JWT_SECRET")
-if not SECRET_KEY:
-    raise RuntimeError("JWT_SECRET environment variable is not set. Refusing to start without a signing secret.")
-ALGORITHM  = "HS256"
+SECRET_KEY  = JWT_SECRET
+ALGORITHM   = "HS256"
 EXPIRY_DAYS = 7
 
 

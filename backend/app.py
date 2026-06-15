@@ -13,13 +13,13 @@ from backend.routes import auth_routes, profile_routes, chat_routes, quiz_routes
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 
-SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+from backend.core.config import SENTRY_DSN, ENVIRONMENT
 if SENTRY_DSN:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         integrations=[FastApiIntegration(), StarletteIntegration()],
         traces_sample_rate=0.2,
-        environment=os.getenv("ENVIRONMENT", "production"),
+        environment=ENVIRONMENT,
     )
 
 # ── Startup / shutdown ─────────────────────────

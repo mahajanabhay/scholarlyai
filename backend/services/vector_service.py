@@ -5,8 +5,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from backend.core.config import CHROMA_BASE_DIR, EMBED_MODEL
 import chromadb
 
-CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
-CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8001"))
+from backend.core.config import CHROMA_HOST, CHROMA_PORT
 
 try:
     _chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)

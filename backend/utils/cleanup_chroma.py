@@ -7,12 +7,10 @@ import os
 import shutil
 import time
 from pathlib import Path
-from dotenv import load_dotenv
+from backend.core.config import CHROMA_BASE_DIR as _CHROMA_BASE, CHROMA_MAX_AGE_DAYS
 
-load_dotenv()
-
-CHROMA_BASE_DIR = Path(os.getenv("CHROMA_BASE_DIR", "chroma_db"))
-MAX_AGE_DAYS    = int(os.getenv("CHROMA_MAX_AGE_DAYS", "30"))
+CHROMA_BASE_DIR = Path(_CHROMA_BASE)
+MAX_AGE_DAYS    = CHROMA_MAX_AGE_DAYS
 cutoff          = time.time() - (MAX_AGE_DAYS * 86400)
 
 if not CHROMA_BASE_DIR.exists():

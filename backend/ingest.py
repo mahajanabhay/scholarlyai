@@ -17,12 +17,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
-from dotenv import load_dotenv
-
-load_dotenv()
-
-CHROMA_BASE_DIR = os.getenv("CHROMA_BASE_DIR", "./chroma_db")
-EMBED_MODEL     = os.getenv("EMBED_MODEL", "all-MiniLM-L6-v2")
+from backend.core.config import CHROMA_BASE_DIR, EMBED_MODEL
 
 # Lock for concurrent access to vector store
 _ingest_lock = threading.Lock()

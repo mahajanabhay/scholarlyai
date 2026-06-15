@@ -23,8 +23,9 @@ def require_admin(current_user: dict = Depends(get_current_user)):
 
 router = APIRouter()
 
-UPLOAD_DIR  = os.getenv("KNOWLEDGE_UPLOAD_DIR", "./knowledge_uploads")
-CHROMA_BASE = os.getenv("CHROMA_BASE_DIR", "./chroma_db")
+from backend.core.config import KNOWLEDGE_UPLOAD_DIR, CHROMA_BASE_DIR
+UPLOAD_DIR  = KNOWLEDGE_UPLOAD_DIR
+CHROMA_BASE = CHROMA_BASE_DIR
 SHARED_SESSION = "shared"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)

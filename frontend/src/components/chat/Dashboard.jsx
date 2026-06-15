@@ -164,12 +164,14 @@ export default function Dashboard() {
 
     // Touch streak & load XP/streak/profile on mount
     // Restore cached profile data for offline use
+    // Only use cache as fallback — DB fetch always takes priority
     const cachedStreak  = localStorage.getItem(`scholarly_streak_${uid}`);
     const cachedXp      = localStorage.getItem(`scholarly_xp_${uid}`);
     const cachedProfile = localStorage.getItem(`scholarly_profile_${uid}`);
-    if (cachedStreak)  setStreakData(JSON.parse(cachedStreak));
-    if (cachedXp)      setXpData(JSON.parse(cachedXp));
-    if (cachedProfile) setProfileData(JSON.parse(cachedProfile));
+    // Set cached values only as placeholders — will be overwritten by DB fetch
+    try { if (cachedStreak)  setStreakData(JSON.parse(cachedStreak)); } catch {}
+    try { if (cachedXp)      setXpData(JSON.parse(cachedXp)); } catch {}
+    try { if (cachedProfile) setProfileData(JSON.parse(cachedProfile)); } catch {}
 
     // Touch streak & load XP/streak/profile on mount — update cache on success
     Promise.all([
