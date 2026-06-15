@@ -170,7 +170,7 @@ export default function Dashboard() {
     const cachedProfile = localStorage.getItem(`scholarly_profile_${uid}`);
     // Set cached values only as placeholders — will be overwritten by DB fetch
     try { if (cachedStreak)  setStreakData(JSON.parse(cachedStreak)); } catch {}
-    try { if (cachedXp)      setXpData(JSON.parse(cachedXp)); } catch {}
+    // try { if (cachedXp)      setXpData(JSON.parse(cachedXp)); } catch {}
     try { if (cachedProfile) setProfileData(JSON.parse(cachedProfile)); } catch {}
 
     // Touch streak & load XP/streak/profile on mount — update cache on success
