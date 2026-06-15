@@ -755,3 +755,14 @@ async def get_audit_log(
         ]}
     finally:
         release_connection(conn)
+
+@router.get("/usage/{user_id}")
+async def get_usage_endpoint(user_id: str, current_user: dict = Depends(get_current_user)):
+    if user_id != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access forbidden.")
+    from backend.services.usage_service import get_usage, FREE_LIMITS
+    usage = get_usage(user_id)
+    return {
+        "chat":  {"used": usage["chat"],  "limit": FREE_LIMITS["chat"]},
+        "quiz":  {"used": usage["quiz"],  "limit": FREE_LIMITS["quiz"]},
+    }

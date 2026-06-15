@@ -13,6 +13,7 @@ from backend.routes.chat_routes import NON_ACADEMIC_REPLY, is_academic_query
 from backend.services.memory_service import push_notification, record_weakness
 from backend.services.vector_service import get_quiz_memory, get_vector_db, reset_quiz_memory
 from backend.db import get_connection, release_connection
+from backend.services.usage_service import increment_usage, FREE_LIMITS
 
 
 router = APIRouter()
@@ -289,7 +290,14 @@ async def quiz_endpoint(
     try:
         quiz_mem = get_quiz_memory(session_id)
         is_quiz_start = is_starting.lower() == "true"
-
+        # Enforce daily quiz limit on new quiz starts only
+        if is_quiz_start:
+            allowed = await asyncio.to_thread(increment_usage, current_user["user_id"], "quiz")
+            if not allowed:
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Daily quiz limit of {FREE_LIMITS['quiz']} reached. Resets at midnight."
+                )
         # ── Strict academic gate (only check when starting a new quiz topic) ──
         if is_quiz_start and not is_academic_query(message):
             raise HTTPException(

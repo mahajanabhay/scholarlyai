@@ -1,8 +1,8 @@
 from locust import HttpUser, task, between
 import random
 
-TEST_EMAIL    = "loadtest@clarix.ai"
-TEST_PASSWORD = "LoadTest123!"
+TEST_EMAIL    = "abhaymahaja097@gmail.com"
+TEST_PASSWORD = "abhi2004"
 TEST_TOKEN    = ""  # filled after login
 
 

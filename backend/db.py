@@ -268,6 +268,16 @@ def init_db():
         )
         """)
 
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usage_limits (
+            user_id    TEXT PRIMARY KEY,
+            date       DATE NOT NULL DEFAULT CURRENT_DATE,
+            chat_count INTEGER DEFAULT 0,
+            quiz_count INTEGER DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """)
+
         conn.commit()
 
         conn.commit()

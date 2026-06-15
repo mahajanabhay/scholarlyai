@@ -14,6 +14,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pypdf import PdfReader
 from backend.core.jwt_auth import get_current_user
 from backend.services.chat_history_service import save_message, load_history, get_user_sessions, delete_session
+from backend.services.usage_service import increment_usage, FREE_LIMITS
 
 router = APIRouter()
 
@@ -298,7 +299,12 @@ async def chat_endpoint(
         word in message.lower()
         for word in ["simplify", "explain", "tutor", "help me understand", "teach me", "describe"]
     )
-
+    
+    # Enforce daily chat limit
+    if not await asyncio.to_thread(increment_usage, current_user["user_id"], "chat"):
+        def _limit():
+            yield f"⚠️ You've reached your daily limit of {FREE_LIMITS['chat']} messages. Limit resets at midnight."
+        return StreamingResponse(_limit(), media_type="text/plain")
     if mode != "CODE" and not await asyncio.to_thread(is_academic_query, message):
         def _refuse():
             yield NON_ACADEMIC_REPLY

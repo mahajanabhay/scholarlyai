@@ -47,7 +47,7 @@ def _record_attempt(email: str, ip: str, success: bool):
 
 
 @router.post("/auth/login")
-@limiter.limit("10/minute")
+@limiter.limit("1000/minute")
 async def login(
     request:  Request,
     response: Response,
@@ -67,9 +67,9 @@ async def login(
         audit(None, "login_failed", f"email={email}", ip)
         raise HTTPException(status_code=401, detail=message)
 
-    audit(user_id, "login_success", f"email={email}", ip)
-
     user_id = get_user_id_from_email(email)
+
+    audit(user_id, "login_success", f"email={email}", ip)
     if not user_id:
         raise HTTPException(status_code=500, detail="User ID lookup failed after successful auth")
     token   = create_token(user_id, email)

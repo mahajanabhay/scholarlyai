@@ -18,8 +18,8 @@ def send_streak_warnings():
         # Users with active streak who haven't touched it today
         cur.execute("""
             SELECT user_id FROM user_streaks
-            WHERE data->>'last_active' = %s
-            AND (data->>'current')::int > 0
+            WHERE last_active = %s
+            AND (current)::int > 0
         """, (yesterday,))
         rows = cur.fetchall()
 
@@ -46,7 +46,7 @@ def send_inactivity_reminders():
             SELECT id FROM users
             WHERE id IN (
                 SELECT user_id FROM user_streaks
-                WHERE data->>'last_active' <= %s
+                WHERE last_active <= %s
             )
         """, (two_days_ago,))
         rows = cur.fetchall()
