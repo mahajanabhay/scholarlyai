@@ -47,16 +47,21 @@ async def lifespan(app: FastAPI):
         from backend.ingest import ingest_pdfs
         import glob
 
-        # Re-index each user's upload directory on startup
-        if os.path.exists(KNOWLEDGE_UPLOAD_DIR):
-            for entry in os.scandir(KNOWLEDGE_UPLOAD_DIR):
-                if entry.is_dir() and entry.name.startswith("user_"):
-                    pdfs = glob.glob(os.path.join(entry.path, "*.pdf"))
-                    if pdfs:
-                        session_id = entry.name
-                        print(f"📄 Re-indexing {len(pdfs)} PDFs for {session_id}...")
-                        ingest_pdfs(entry.path, session_id)
-        print("✅ Per-user knowledge bases re-indexed.")
+        # Re-index each user's upload directory in background — never block startup
+        async def _reindex_all():
+            import asyncio as _asyncio
+            if os.path.exists(KNOWLEDGE_UPLOAD_DIR):
+                for entry in os.scandir(KNOWLEDGE_UPLOAD_DIR):
+                    if entry.is_dir() and entry.name.startswith("user_"):
+                        pdfs = glob.glob(os.path.join(entry.path, "*.pdf"))
+                        if pdfs:
+                            session_id = entry.name
+                            print(f"📄 Re-indexing {len(pdfs)} PDFs for {session_id}...")
+                            await _asyncio.to_thread(ingest_pdfs, entry.path, session_id)
+            print("✅ Per-user knowledge bases re-indexed.")
+
+        import asyncio as _asyncio
+        _asyncio.create_task(_reindex_all())
     except Exception as e:
         print(f"⚠️  Chroma re-index skipped: {e}")
 
