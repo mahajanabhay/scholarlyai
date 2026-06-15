@@ -586,6 +586,8 @@ async def push_notification_endpoint(
     notif_type: str   = Form("info"),
     current_user: dict = Depends(get_current_user)
 ):
+    if user_id != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access forbidden.")
     push_notification(user_id, message, notif_type)
     return {"status": "pushed"}
 

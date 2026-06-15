@@ -106,11 +106,12 @@ async def login(
         "bio":           user.bio,
         "subject_focus": user.subject_focus,
     }
+    from backend.core.config import ENVIRONMENT
     response.set_cookie(
         key="scholarly_token",
         value=token,
         httponly=True,
-        secure=False,   # set True in production (HTTPS)
+        secure=ENVIRONMENT != "development",
         samesite="lax",
         max_age=60 * 60 * 24 * 7
     )
@@ -149,11 +150,12 @@ async def register(
         "bio":           "",
         "subject_focus": [],
     }
+    from backend.core.config import ENVIRONMENT
     response.set_cookie(
         key="scholarly_token",
         value=token,
         httponly=True,
-        secure=False,
+        secure=ENVIRONMENT != "development",
         samesite="lax",
         max_age=60 * 60 * 24 * 7
     )
@@ -191,11 +193,12 @@ async def refresh_token(
 ):
     """Issue a fresh token and rotate — old token is implicitly invalidated."""
     new_token = create_token(current_user["user_id"], current_user["email"])
+    from backend.core.config import ENVIRONMENT
     response.set_cookie(
         key="scholarly_token",
         value=new_token,
         httponly=True,
-        secure=False,  # set True in production
+        secure=ENVIRONMENT != "development",
         samesite="lax",
         max_age=60 * 60 * 24 * 7
     )
