@@ -51,7 +51,11 @@ async def lifespan(app: FastAPI):
         SHARED_SESSION = "shared"
 
         collection = get_or_create_collection(SHARED_SESSION)
-        if collection.count() == 0:
+        try:
+            count = collection.count()
+        except Exception:
+            count = 0
+        if count == 0:
             pdfs = glob.glob(os.path.join(UPLOAD_DIR, "*.pdf"))
             if pdfs:
                 print(f"🔄 Re-indexing {len(pdfs)} PDFs into shared knowledge base...")
