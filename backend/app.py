@@ -43,26 +43,20 @@ async def lifespan(app: FastAPI):
     _asyncio.create_task(_notification_loop())
 
     try:
-        from backend.services.vector_service import get_vector_db as get_or_create_collection
+        from backend.core.config import KNOWLEDGE_UPLOAD_DIR
         from backend.ingest import ingest_pdfs
         import glob
 
-        UPLOAD_DIR     = os.getenv("KNOWLEDGE_UPLOAD_DIR", "./knowledge_uploads")
-        SHARED_SESSION = "shared"
-
-        collection = get_or_create_collection(SHARED_SESSION)
-        try:
-            count = collection.count()
-        except Exception:
-            count = 0
-        if count == 0:
-            pdfs = glob.glob(os.path.join(UPLOAD_DIR, "*.pdf"))
-            if pdfs:
-                print(f"🔄 Re-indexing {len(pdfs)} PDFs into shared knowledge base...")
-                ingest_pdfs(UPLOAD_DIR, SHARED_SESSION)
-                print("✅ Shared knowledge base re-indexed.")
-            else:
-                print("ℹ️  No PDFs found in knowledge_uploads — skipping re-index.")
+        # Re-index each user's upload directory on startup
+        if os.path.exists(KNOWLEDGE_UPLOAD_DIR):
+            for entry in os.scandir(KNOWLEDGE_UPLOAD_DIR):
+                if entry.is_dir() and entry.name.startswith("user_"):
+                    pdfs = glob.glob(os.path.join(entry.path, "*.pdf"))
+                    if pdfs:
+                        session_id = entry.name
+                        print(f"📄 Re-indexing {len(pdfs)} PDFs for {session_id}...")
+                        ingest_pdfs(entry.path, session_id)
+        print("✅ Per-user knowledge bases re-indexed.")
     except Exception as e:
         print(f"⚠️  Chroma re-index skipped: {e}")
 
