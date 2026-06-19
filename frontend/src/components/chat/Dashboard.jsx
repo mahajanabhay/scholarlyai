@@ -10,6 +10,7 @@ import WeaknessPanel from "@/components/profile/WeaknessPanel";
 import NotificationsPanel from "@/components/profile/NotificationsPanel";
 import KnowledgePanel from "@/components/panel/KnowledgePanel";
 import OnboardingModal from "@/components/onboarding/OnboardingModal";
+import AdminPanel from "@/components/admin/AdminPanel";
 
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -61,6 +62,8 @@ export default function Dashboard() {
   const [forgotEmail, setForgotEmail]               = useState('');
   const [forgotMsg, setForgotMsg]                   = useState(null);
   const [forgotLoading, setForgotLoading]           = useState(false);
+  const [showAdmin, setShowAdmin]       = useState(false);
+  const [isAdmin, setIsAdmin]           = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery]       = useState("");
@@ -191,6 +194,7 @@ export default function Dashboard() {
         }
 
         localStorage.setItem(`scholarly_profile_${uid}`, JSON.stringify(d));
+      if (d?.is_admin) setIsAdmin(true);
       }).catch(e => console.error('[profile]', e)),
       apiFetch(`${API_URL}/notifications/${uid}`).then(r => r.json()).then(d => {
         const unread = (d.notifications || []).filter(n => !n.read).length;
@@ -931,6 +935,14 @@ export default function Dashboard() {
                       </button>
                     ))}
 
+                    {isAdmin && (
+                        <button onClick={() => { setShowProfileMenu(false); setShowAdmin(true); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-100 dark:hover:bg-white/5 transition-all">
+                          <Shield size={16} className="text-violet-400 shrink-0" />
+                          <p className="text-sm text-violet-400 font-semibold">Admin Panel</p>
+                        </button>
+                      )}
+
                     <div className="h-px mx-3 bg-zinc-100 dark:bg-white/[0.07]" />
 
                     {/* Log out */}
@@ -1399,6 +1411,10 @@ export default function Dashboard() {
             <KnowledgePanel getAuthHeaders={getAuthHeaders} />
           </div>
         </div>
+      )}
+
+      {showAdmin && (
+        <AdminPanel onClose={() => setShowAdmin(false)} />
       )}
 
       {/* ── Settings Panel ── */}

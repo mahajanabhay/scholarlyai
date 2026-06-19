@@ -769,3 +769,96 @@ async def get_usage_endpoint(user_id: str, current_user: dict = Depends(get_curr
         "chat":  {"used": usage["chat"],  "limit": FREE_LIMITS["chat"]},
         "quiz":  {"used": usage["quiz"],  "limit": FREE_LIMITS["quiz"]},
     }
+
+@router.get("/admin/users")
+async def admin_get_users(current_user: dict = Depends(get_current_user)):
+    from backend.db import get_connection, release_connection
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT is_admin FROM users WHERE id = %s", (current_user["user_id"],))
+        if not (cur.fetchone() or [False])[0]:
+            raise HTTPException(status_code=403, detail="Admin only.")
+        cur.execute("""
+            SELECT u.id, u.name, u.email, u.is_admin, u.is_verified, u.created_at,
+                   COALESCE(x.total, 0) as xp, COALESCE(x.level, 1) as level
+            FROM users u
+            LEFT JOIN user_xp x ON x.user_id = u.id
+            ORDER BY u.created_at DESC
+        """)
+        rows = cur.fetchall()
+        return {"users": [
+            {"id": r[0], "name": r[1], "email": r[2], "is_admin": r[3],
+             "is_verified": r[4], "created_at": str(r[5]), "xp": r[6], "level": r[7]}
+            for r in rows
+        ]}
+    finally:
+        release_connection(conn)
+
+
+@router.delete("/admin/users/{target_id}")
+async def admin_delete_user(target_id: str, current_user: dict = Depends(get_current_user)):
+    from backend.db import get_connection, release_connection
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT is_admin FROM users WHERE id = %s", (current_user["user_id"],))
+        if not (cur.fetchone() or [False])[0]:
+            raise HTTPException(status_code=403, detail="Admin only.")
+        if target_id == current_user["user_id"]:
+            raise HTTPException(status_code=400, detail="Cannot delete your own account.")
+        cur.execute("DELETE FROM users WHERE id = %s", (target_id,))
+        conn.commit()
+        from backend.services.audit_service import audit
+        audit(current_user["user_id"], "admin_delete_user", f"deleted={target_id}")
+        return {"status": "deleted"}
+    finally:
+        release_connection(conn)
+
+
+@router.post("/admin/users/{target_id}/toggle-admin")
+async def admin_toggle_admin(target_id: str, current_user: dict = Depends(get_current_user)):
+    from backend.db import get_connection, release_connection
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT is_admin FROM users WHERE id = %s", (current_user["user_id"],))
+        if not (cur.fetchone() or [False])[0]:
+            raise HTTPException(status_code=403, detail="Admin only.")
+        cur.execute("UPDATE users SET is_admin = NOT is_admin WHERE id = %s RETURNING is_admin", (target_id,))
+        row = cur.fetchone()
+        conn.commit()
+        return {"is_admin": row[0]}
+    finally:
+        release_connection(conn)
+
+
+@router.get("/admin/stats")
+async def admin_get_stats(current_user: dict = Depends(get_current_user)):
+    from backend.db import get_connection, release_connection
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT is_admin FROM users WHERE id = %s", (current_user["user_id"],))
+        if not (cur.fetchone() or [False])[0]:
+            raise HTTPException(status_code=403, detail="Admin only.")
+        cur.execute("SELECT COUNT(*) FROM users")
+        total_users = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '24 hours'")
+        new_today = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(DISTINCT user_id) FROM chat_sessions WHERE created_at > NOW() - INTERVAL '24 hours'")
+        dau = cur.fetchone()[0]
+        cur.execute("SELECT u.name, x.total FROM user_xp x JOIN users u ON u.id = x.user_id ORDER BY x.total DESC LIMIT 10")
+        leaderboard = [{"name": r[0], "xp": r[1]} for r in cur.fetchall()]
+        cur.execute("SELECT SUM(chat_count), SUM(quiz_count) FROM usage_limits WHERE date = CURRENT_DATE")
+        usage = cur.fetchone()
+        return {
+            "total_users":   total_users,
+            "new_today":     new_today,
+            "dau":           dau,
+            "leaderboard":   leaderboard,
+            "chats_today":   usage[0] or 0,
+            "quizzes_today": usage[1] or 0,
+        }
+    finally:
+        release_connection(conn)
