@@ -77,7 +77,7 @@ export default function AdminPanel({ onClose }) {
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
                 tab === id
                   ? "bg-violet-600 text-white"
-                  : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/[0.05]"
+                  : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5"
               }`}>
               <Icon size={13} />{label}
             </button>
@@ -104,7 +104,7 @@ export default function AdminPanel({ onClose }) {
                   { label: "Chats Today",    value: stats.chats_today   },
                   { label: "Quizzes Today",  value: stats.quizzes_today },
                 ].map(({ label, value }) => (
-                  <div key={label} className="p-4 rounded-2xl bg-zinc-50 dark:bg-white/[0.03] border border-zinc-200 dark:border-white/[0.07]">
+                  <div key={label} className="p-4 rounded-2xl bg-zinc-50 dark:bg-white/3 border border-zinc-200 dark:border-white/[0.07]">
                     <p className="text-xs text-zinc-500 mb-1">{label}</p>
                     <p className="text-2xl font-black text-zinc-900 dark:text-white">{value}</p>
                   </div>
@@ -114,7 +114,7 @@ export default function AdminPanel({ onClose }) {
                 <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">XP Leaderboard</p>
                 <div className="space-y-2">
                   {stats.leaderboard.map((u, i) => (
-                    <div key={i} className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-white/[0.03] border border-zinc-100 dark:border-white/[0.05]">
+                    <div key={i} className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-white/3 border border-zinc-100 dark:border-white/5">
                       <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                         <span className="text-zinc-400 mr-2">#{i + 1}</span>{u.name}
                       </span>
@@ -130,7 +130,7 @@ export default function AdminPanel({ onClose }) {
           {tab === "users" && (
             <div className="space-y-2">
               {users.map(u => (
-                <div key={u.id} className="flex items-center gap-4 px-4 py-3 rounded-xl bg-zinc-50 dark:bg-white/[0.03] border border-zinc-100 dark:border-white/[0.05]">
+                <div key={u.id} className="flex items-center gap-4 px-4 py-3 rounded-xl bg-zinc-50 dark:bg-white/3 border border-zinc-100 dark:border-white/5">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 truncate">{u.name}</p>
                     <p className="text-xs text-zinc-400 truncate">{u.email}</p>
@@ -157,7 +157,7 @@ export default function AdminPanel({ onClose }) {
           {tab === "audit" && (
             <div className="space-y-2">
               {auditLog.map((log, i) => (
-                <div key={i} className="flex items-start gap-4 px-4 py-3 rounded-xl bg-zinc-50 dark:bg-white/[0.03] border border-zinc-100 dark:border-white/[0.05]">
+                <div key={i} className="flex items-start gap-4 px-4 py-3 rounded-xl bg-zinc-50 dark:bg-white/3 border border-zinc-100 dark:border-white/5">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">{log.action}</p>
                     <p className="text-xs text-zinc-400 truncate">{log.detail}</p>

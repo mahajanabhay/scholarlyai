@@ -1,5 +1,6 @@
 from locust import HttpUser, task, between
 import random
+import json
 
 TEST_EMAIL    = "abhaymahaja097@gmail.com"
 TEST_PASSWORD = "abhi2004"
@@ -60,3 +61,63 @@ class ClarixUser(HttpUser):
     @task(1)
     def get_sessions(self):
         self.client.get("/chat/sessions", headers=self.auth_headers())
+
+    @task(2)
+    def chat_message(self):
+        if not self.user_id:
+            return
+        session_id = f"loadtest_{self.user_id}"
+        with self.client.post(
+            "/chat",
+            data={
+                "message": "Explain Newton's second law of motion briefly.",
+                "session_id": session_id,
+                "mode": "LEARN",
+            },
+            headers=self.auth_headers(),
+            catch_response=True,
+            stream=True,
+        ) as r:
+            if r.status_code != 200:
+                r.failure(f"chat failed: {r.status_code}")
+
+    @task(1)
+    def quiz_generate(self):
+        if not self.user_id:
+            return
+        subjects = ["Physics", "Mathematics", "Biology", "Chemistry"]
+        session_id = f"loadtest_{self.user_id}_{random.randint(1,99999)}"
+        with self.client.post(
+            "/quiz",
+            data={
+                "message": random.choice(subjects),
+                "session_id": session_id,
+                "mode": "QUIZ",
+                "quiz_type": "single",
+                "question_number": 1,
+                "is_starting": "true",
+                "last_was_wrong": "false",
+                "user_id": self.user_id,
+            },
+            headers=self.auth_headers(),
+            catch_response=True,
+        ) as r:
+            if r.status_code != 200:
+                r.failure(f"quiz failed: {r.status_code}")
+
+    @task(1)
+    def study_session_retry_weak(self):
+        if not self.user_id:
+            return
+        with self.client.post(
+            "/study-session/retry-weak",
+            data={
+                "subject": "Physics",
+                "weak_topic_questions": json.dumps(["Newton's laws", "Momentum"]),
+                "num_questions": 3,
+            },
+            headers=self.auth_headers(),
+            catch_response=True,
+        ) as r:
+            if r.status_code != 200:
+                r.failure(f"retry_weak failed: {r.status_code}")

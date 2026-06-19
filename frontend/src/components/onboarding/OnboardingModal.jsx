@@ -3,6 +3,7 @@ import { useState } from "react";
 import { trackEvent, Events } from "@/lib/analytics";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const TOTAL_QUIZ_QUESTIONS = 3;
 
 const SUBJECTS = [
   "Mathematics", "Physics", "Chemistry", "Biology", "Computer Science",
@@ -11,29 +12,40 @@ const SUBJECTS = [
 ];
 
 export default function OnboardingModal({ userId, onComplete, apiFetch }) {
-  const [step, setStep]         = useState(1);
-  const [selected, setSelected] = useState([]);
-  const [loading, setLoading]   = useState(false);
-  const [questions, setQuestions] = useState([]);
-  const [answers, setAnswers]     = useState({});
-  const [quizDone, setQuizDone]   = useState(false);
+  const [step, setStep]           = useState(1);
+  const [selected, setSelected]   = useState([]);
+  const [loading, setLoading]     = useState(false);
   const [quizError, setQuizError] = useState("");
+
+  const [sessionId]      = useState(() => `onboarding_${userId}_${Date.now()}`);
+  const [questionNum, setQuestionNum]   = useState(1);
+  const [currentQuestion, setCurrentQ]  = useState("");
+  const [userAnswer, setUserAnswer]     = useState("");
+  const [feedback, setFeedback]         = useState("");
+  const [correctCount, setCorrectCount] = useState(0);
+  const [quizDone, setQuizDone]         = useState(false);
 
   const toggle = (s) =>
     setSelected(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
 
-  const loadQuiz = async () => {
+  const startQuiz = async () => {
     setLoading(true);
     setQuizError("");
     const subject = selected[0] || "General Knowledge";
     try {
       const fd = new FormData();
-      fd.append("subject", subject);
-      fd.append("num_questions", "3");
-      fd.append("difficulty", "medium");
-      const res = await apiFetch(`${API_URL}/quiz/generate`, { method: "POST", body: fd });
+      fd.append("message", subject);
+      fd.append("session_id", sessionId);
+      fd.append("mode", "QUIZ");
+      fd.append("quiz_type", "single");
+      fd.append("question_number", "1");
+      fd.append("is_starting", "true");
+      fd.append("last_was_wrong", "false");
+      fd.append("user_id", userId);
+      const res = await apiFetch(`${API_URL}/quiz`, { method: "POST", body: fd });
       const data = await res.json();
-      setQuestions(data.questions || []);
+      setCurrentQ(data.new_question || "");
+      setQuestionNum(1);
       setStep(3);
     } catch (e) {
       setQuizError("Couldn't load quiz. You can skip and start studying.");
@@ -42,29 +54,45 @@ export default function OnboardingModal({ userId, onComplete, apiFetch }) {
     }
   };
 
-  const submitQuiz = async () => {
+  const submitAnswer = async () => {
+    if (!userAnswer.trim()) return;
     setLoading(true);
     const subject = selected[0] || "General Knowledge";
-    const wrongTopics = questions
-      .filter((q, i) => answers[i] !== q.answer)
-      .map(q => q.question);
-
     try {
-      // Record weaknesses from wrong answers
-      if (wrongTopics.length > 0) {
-        const fd = new FormData();
-        fd.append("subject", subject);
-        fd.append("wrong_topics", JSON.stringify(wrongTopics));
-        fd.append("score", String(questions.length - wrongTopics.length));
-        fd.append("total", String(questions.length));
-        await apiFetch(`${API_URL}/study-session/results`, { method: "POST", body: fd });
+      const wasLastQuestion = questionNum >= TOTAL_QUIZ_QUESTIONS;
+      const fd = new FormData();
+      fd.append("message", userAnswer.trim());
+      fd.append("session_id", sessionId);
+      fd.append("mode", "QUIZ");
+      fd.append("quiz_type", "single");
+      fd.append("question_number", String(questionNum + 1));
+      fd.append("is_starting", "false");
+      fd.append("last_question", currentQuestion);
+      fd.append("user_id", userId);
+      fd.append("last_was_wrong", "false");
+
+      const res = await apiFetch(`${API_URL}/quiz`, { method: "POST", body: fd });
+      const data = await res.json();
+
+      if (data.is_correct) setCorrectCount(c => c + 1);
+      setFeedback(data.feedback || "");
+
+      if (wasLastQuestion) {
+        setQuizDone(true);
+      } else {
+        // brief pause to show feedback before next question
+        setTimeout(() => {
+          setCurrentQ(data.new_question || "");
+          setQuestionNum(n => n + 1);
+          setUserAnswer("");
+          setFeedback("");
+        }, 1800);
       }
     } catch (e) {
-      console.error("Weakness recording failed", e);
+      setQuizError("Something went wrong grading that answer.");
+    } finally {
+      setLoading(false);
     }
-
-    setQuizDone(true);
-    setLoading(false);
   };
 
   const saveAndComplete = async () => {
@@ -89,14 +117,12 @@ export default function OnboardingModal({ userId, onComplete, apiFetch }) {
     <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
       <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "2.5rem", width: "100%", maxWidth: "520px", fontFamily: "'DM Sans','Helvetica Neue',sans-serif", color: "#e8e8f0" }}>
 
-        {/* Progress */}
         <div style={{ display: "flex", gap: "0.4rem", marginBottom: "2rem" }}>
           {[1, 2, 3].map(n => (
             <div key={n} style={{ flex: 1, height: "3px", borderRadius: "99px", background: n <= step ? "#7c5cfc" : "rgba(255,255,255,0.1)", transition: "background 0.3s" }} />
           ))}
         </div>
 
-        {/* Step 1 — Welcome */}
         {step === 1 && (
           <div>
             <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>👋</div>
@@ -108,7 +134,6 @@ export default function OnboardingModal({ userId, onComplete, apiFetch }) {
           </div>
         )}
 
-        {/* Step 2 — Pick subjects */}
         {step === 2 && (
           <div>
             <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: "1.3rem", fontWeight: 800, margin: "0 0 0.4rem", letterSpacing: "-0.02em" }}>What are you studying?</h2>
@@ -126,55 +151,53 @@ export default function OnboardingModal({ userId, onComplete, apiFetch }) {
             {quizError && <p style={{ color: "#f87171", fontSize: "0.8rem", marginBottom: "1rem" }}>{quizError}</p>}
             <div style={{ display: "flex", gap: "0.75rem" }}>
               <button onClick={() => setStep(1)} style={backBtnStyle}>←</button>
-              <button onClick={selected.length > 0 ? loadQuiz : saveAndComplete} disabled={loading} style={{ ...btnStyle, flex: 1, opacity: loading ? 0.6 : 1 }}>
+              <button onClick={selected.length > 0 ? startQuiz : saveAndComplete} disabled={loading} style={{ ...btnStyle, flex: 1, opacity: loading ? 0.6 : 1 }}>
                 {loading ? "Loading..." : selected.length === 0 ? "Skip →" : `Quick quiz on ${selected[0]} →`}
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 3 — Mini quiz */}
         {step === 3 && !quizDone && (
           <div>
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: "1.3rem", fontWeight: 800, margin: "0 0 0.4rem", letterSpacing: "-0.02em" }}>Quick baseline quiz</h2>
-            <p style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.4)", margin: "0 0 1.5rem" }}>3 questions on {selected[0]} — helps Clarix find your weak spots instantly.</p>
-            {questions.map((q, i) => (
-              <div key={i} style={{ marginBottom: "1.25rem" }}>
-                <p style={{ fontSize: "0.9rem", fontWeight: 500, margin: "0 0 0.6rem" }}>{i + 1}. {q.question}</p>
-                {["A", "B", "C", "D"].map(opt => (
-                  q.options?.[opt] && (
-                    <button key={opt} onClick={() => setAnswers(a => ({ ...a, [i]: opt }))} style={{
-                      display: "block", width: "100%", textAlign: "left", padding: "0.5rem 0.85rem", borderRadius: "8px", fontSize: "0.85rem", cursor: "pointer", fontFamily: "inherit", marginBottom: "0.35rem", transition: "all 0.15s",
-                      background: answers[i] === opt ? "#7c5cfc" : "rgba(255,255,255,0.04)",
-                      color: answers[i] === opt ? "#fff" : "rgba(255,255,255,0.6)",
-                      border: answers[i] === opt ? "1px solid #7c5cfc" : "1px solid rgba(255,255,255,0.08)",
-                    }}>{opt}) {q.options[opt]}</button>
-                  )
-                ))}
-              </div>
-            ))}
-            <div style={{ display: "flex", gap: "0.75rem" }}>
-              <button onClick={() => setStep(2)} style={backBtnStyle}>←</button>
-              <button
-                onClick={submitQuiz}
-                disabled={loading || Object.keys(answers).length < questions.length}
-                style={{ ...btnStyle, flex: 1, opacity: (loading || Object.keys(answers).length < questions.length) ? 0.5 : 1 }}
-              >
-                {loading ? "Saving..." : "Submit →"}
-              </button>
-            </div>
+            <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: "1.3rem", fontWeight: 800, margin: "0 0 0.4rem", letterSpacing: "-0.02em" }}>
+              Question {questionNum} of {TOTAL_QUIZ_QUESTIONS}
+            </h2>
+            <p style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.7)", margin: "0 0 1.25rem", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+              {currentQuestion}
+            </p>
+            <textarea
+              value={userAnswer}
+              onChange={e => setUserAnswer(e.target.value)}
+              placeholder="Type your answer..."
+              disabled={loading || !!feedback}
+              rows={3}
+              style={{ width: "100%", padding: "0.75rem 1rem", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#e8e8f0", fontSize: "0.9rem", fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: "1rem", resize: "vertical" }}
+            />
+            {feedback && (
+              <p style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)", marginBottom: "1rem", whiteSpace: "pre-wrap" }}>
+                {feedback}
+              </p>
+            )}
+            {quizError && <p style={{ color: "#f87171", fontSize: "0.8rem", marginBottom: "1rem" }}>{quizError}</p>}
+            <button
+              onClick={submitAnswer}
+              disabled={loading || !!feedback || !userAnswer.trim()}
+              style={{ ...btnStyle, opacity: (loading || !!feedback || !userAnswer.trim()) ? 0.5 : 1 }}
+            >
+              {loading ? "Checking..." : "Submit →"}
+            </button>
           </div>
         )}
 
-        {/* Step 3 done — results */}
         {step === 3 && quizDone && (
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>🎯</div>
             <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: "1.3rem", fontWeight: 800, margin: "0 0 0.75rem" }}>
-              {questions.filter((q, i) => answers[i] === q.answer).length}/{questions.length} correct
+              {correctCount}/{TOTAL_QUIZ_QUESTIONS} correct
             </h2>
             <p style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.4)", margin: "0 0 2rem", lineHeight: 1.6 }}>
-              {questions.filter((q, i) => answers[i] !== q.answer).length > 0
+              {correctCount < TOTAL_QUIZ_QUESTIONS
                 ? "Clarix has noted your weak areas and will target them in your planner."
                 : "Perfect score! Clarix will keep challenging you."}
             </p>
