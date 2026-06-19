@@ -37,51 +37,58 @@ def get_usage(user_id: str) -> dict:
 
 def increment_usage(user_id: str, kind: str) -> bool:
     """
-    Atomically increments usage counter only if under limit.
+    Atomically increments usage counter.
     Returns True if allowed, False if limit reached.
-    kind: 'chat' | 'quiz'
     """
-    if kind not in _ALLOWED_KINDS:
-        raise ValueError(f"Invalid usage kind: {kind!r}")
+    if kind not in FREE_LIMITS:
+        return False
 
     limit = FREE_LIMITS[kind]
     col   = "chat_count" if kind == "chat" else "quiz_count"
 
-    # Ensure row exists and reset if stale — same upsert as get_usage
     conn = get_connection()
     try:
         cur = conn.cursor()
+        cur.execute(f"""
+            UPDATE usage_limits
+            SET {col} = {col} + 1
+            WHERE user_id = %s
+              AND date = CURRENT_DATE
+              AND {col} < %s
+            RETURNING {col}
+        """, (user_id, limit))
+        row = cur.fetchone()
+        if row:
+            conn.commit()
+            return True
+
+        # Check if row exists for today
         cur.execute("""
-            INSERT INTO usage_limits (user_id, date, chat_count, quiz_count)
-            VALUES (%s, CURRENT_DATE, 0, 0)
-            ON CONFLICT (user_id) DO UPDATE
-                SET date       = CASE WHEN usage_limits.date < CURRENT_DATE
-                                      THEN CURRENT_DATE ELSE usage_limits.date END,
-                    chat_count = CASE WHEN usage_limits.date < CURRENT_DATE
-                                      THEN 0 ELSE usage_limits.chat_count END,
-                    quiz_count = CASE WHEN usage_limits.date < CURRENT_DATE
-                                      THEN 0 ELSE usage_limits.quiz_count END
+            SELECT 1 FROM usage_limits
+            WHERE user_id = %s AND date = CURRENT_DATE
         """, (user_id,))
+        exists = cur.fetchone()
 
-        # Atomic conditional increment — only bumps if still under limit.
-        # No separate SELECT avoids TOCTOU race under concurrent requests.
-        if col == "chat_count":
+        if not exists:
+            # Insert new row for today and count as first use
             cur.execute("""
-                UPDATE usage_limits
-                SET chat_count = chat_count + 1
-                WHERE user_id = %s AND chat_count < %s
-                RETURNING chat_count
-            """, (user_id, limit))
-        else:
-            cur.execute("""
-                UPDATE usage_limits
-                SET quiz_count = quiz_count + 1
-                WHERE user_id = %s AND quiz_count < %s
-                RETURNING quiz_count
-            """, (user_id, limit))
+                INSERT INTO usage_limits (user_id, date, chat_count, quiz_count)
+                VALUES (%s, CURRENT_DATE, %s, %s)
+                ON CONFLICT (user_id) DO UPDATE
+                    SET date = CURRENT_DATE,
+                        chat_count = CASE WHEN usage_limits.date < CURRENT_DATE THEN %s ELSE usage_limits.chat_count END,
+                        quiz_count = CASE WHEN usage_limits.date < CURRENT_DATE THEN %s ELSE usage_limits.quiz_count END
+            """, (
+                user_id,
+                1 if kind == "chat" else 0,
+                1 if kind == "quiz" else 0,
+                1 if kind == "chat" else 0,
+                1 if kind == "quiz" else 0,
+            ))
+            conn.commit()
+            return True
 
-        allowed = cur.fetchone() is not None
-        conn.commit()
-        return allowed
+        # Row exists but limit reached
+        return False
     finally:
         release_connection(conn)
