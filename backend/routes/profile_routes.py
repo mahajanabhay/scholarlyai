@@ -637,6 +637,7 @@ async def get_revision_endpoint(user_id: str, session_id: Optional[str] = None, 
         max_tokens=1500,
         temperature=0.4,
     )
+
     return {"revision": revision_resp.choices[0].message.content, "weak_topics": weak_topics}
 
 @router.get("/papers/{user_id}")
