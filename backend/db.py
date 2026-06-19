@@ -51,20 +51,26 @@ _init_pool()
 def get_connection():
     """Get a connection from the pool, retrying once if the pool is not up."""
     global connection_pool
-    with _pool_lock:
-        if connection_pool is None:
-            print("⚠️  Pool not initialised — retrying connection...")
-            _init_pool()
+
+    # Lock only guards pool (re)creation — checkout itself is thread-safe
+    # via ThreadedConnectionPool's internal locking. Holding _pool_lock for
+    # every checkout serializes all concurrent requests through one lock.
+    if connection_pool is None:
+        with _pool_lock:
+            if connection_pool is None:
+                print("⚠️  Pool not initialised — retrying connection...")
+                _init_pool()
         if connection_pool is None:
             raise RuntimeError(
                 "Database connection pool is not available. "
                 "Check that PostgreSQL is running and credentials are correct."
             )
-        conn = connection_pool.getconn()
-        if conn.closed:
-            connection_pool.putconn(conn)
-            raise RuntimeError("Retrieved a closed connection from pool.")
-        return conn
+
+    conn = connection_pool.getconn()
+    if conn.closed:
+        connection_pool.putconn(conn)
+        raise RuntimeError("Retrieved a closed connection from pool.")
+    return conn
 
 
 def release_connection(conn) -> None:
