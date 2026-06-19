@@ -1,4 +1,6 @@
 import asyncio
+import os
+import token
 from fastapi import APIRouter, Depends, HTTPException, Form, Request, Response
 import json
 from datetime import date
@@ -111,7 +113,7 @@ async def login(
         key="scholarly_token",
         value=token,
         httponly=True,
-        secure=ENVIRONMENT != "development",
+        secure=os.getenv("ENVIRONMENT", "development") != "development",
         samesite="lax",
         max_age=60 * 60 * 24 * 7
     )
@@ -155,7 +157,7 @@ async def register(
         key="scholarly_token",
         value=token,
         httponly=True,
-        secure=ENVIRONMENT != "development",
+        secure=os.getenv("ENVIRONMENT", "development") != "development",
         samesite="lax",
         max_age=60 * 60 * 24 * 7
     )
@@ -196,9 +198,9 @@ async def refresh_token(
     from backend.core.config import ENVIRONMENT
     response.set_cookie(
         key="scholarly_token",
-        value=new_token,
+        value=token,
         httponly=True,
-        secure=ENVIRONMENT != "development",
+        secure=os.getenv("ENVIRONMENT", "development") != "development",
         samesite="lax",
         max_age=60 * 60 * 24 * 7
     )
