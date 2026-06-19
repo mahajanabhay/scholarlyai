@@ -113,7 +113,7 @@ class ClarixUser(HttpUser):
             "/study-session/retry-weak",
             data={
                 "subject": "Physics",
-                "weak_topic_questions": json.dumps(["Newton's laws", "Momentum"]),
+                "weak_topic_questions": json.dumps(["Newtons laws", "Momentum"]),
                 "num_questions": 3,
             },
             headers=self.auth_headers(),

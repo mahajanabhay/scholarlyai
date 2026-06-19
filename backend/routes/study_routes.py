@@ -222,7 +222,14 @@ async def study_session_retry_weak(
 
     try:
         weak_questions = json.loads(weak_topic_questions)
-        
+        if not isinstance(weak_questions, list):
+            raise HTTPException(status_code=400, detail="weak_topic_questions must be a JSON array.")
+    except HTTPException:
+        raise
+    except (json.JSONDecodeError, TypeError) as e:
+        raise HTTPException(status_code=400, detail=f"Invalid weak_topic_questions JSON: {e}")
+
+    try:
         # Extract key topics from weak questions
         topics_to_focus = ", ".join(weak_questions[:3]) if weak_questions else subject
         
