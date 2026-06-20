@@ -1,25 +1,25 @@
 "use client";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const router       = useRouter();
   const token        = searchParams.get("token");
 
-  const [password, setPassword]   = useState("");
-  const [confirm, setConfirm]     = useState("");
-  const [msg, setMsg]             = useState(null);
-  const [loading, setLoading]     = useState(false);
-  const [done, setDone]           = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm]   = useState("");
+  const [msg, setMsg]           = useState(null);
+  const [loading, setLoading]   = useState(false);
+  const [done, setDone]         = useState(false);
 
   const submit = async () => {
     setMsg(null);
-    if (!token)                       return setMsg({ ok: false, text: "Invalid reset link." });
-    if (password.length < 8)          return setMsg({ ok: false, text: "Password must be at least 8 characters." });
-    if (password !== confirm)         return setMsg({ ok: false, text: "Passwords do not match." });
+    if (!token)              return setMsg({ ok: false, text: "Invalid reset link." });
+    if (password.length < 8) return setMsg({ ok: false, text: "Password must be at least 8 characters." });
+    if (password !== confirm) return setMsg({ ok: false, text: "Passwords do not match." });
 
     setLoading(true);
     const fd = new FormData();
@@ -42,7 +42,6 @@ export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 px-4">
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/[0.07] rounded-2xl shadow-xl p-10 max-w-md w-full space-y-5">
-
         {done ? (
           <div className="text-center space-y-3">
             <div className="text-4xl">✅</div>
@@ -55,7 +54,6 @@ export default function ResetPasswordPage() {
               <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Set new password</h2>
               <p className="text-xs text-zinc-500 mt-1">Must be at least 8 characters.</p>
             </div>
-
             <input
               type="password"
               placeholder="New password"
@@ -70,13 +68,11 @@ export default function ResetPasswordPage() {
               onChange={e => setConfirm(e.target.value)}
               className="w-full px-3 py-2 rounded-xl text-sm bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/[0.07] text-zinc-800 dark:text-zinc-200 outline-none focus:border-violet-500/50"
             />
-
             {msg && (
               <p className={`text-xs font-semibold ${msg.ok ? "text-green-500" : "text-red-400"}`}>
                 {msg.text}
               </p>
             )}
-
             <button
               onClick={submit}
               disabled={loading}
@@ -86,8 +82,15 @@ export default function ResetPasswordPage() {
             </button>
           </>
         )}
-
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p className="text-zinc-500">Loading...</p></div>}>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }
