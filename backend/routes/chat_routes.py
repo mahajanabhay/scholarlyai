@@ -1,5 +1,5 @@
 from email import generator
-from http.client import HTTPException
+from fastapi import HTTPException
 
 from backend.core.llm import client, LLM_MODEL
 import asyncio
@@ -299,7 +299,7 @@ async def chat_endpoint(
         word in message.lower()
         for word in ["simplify", "explain", "tutor", "help me understand", "teach me", "describe"]
     )
-    
+
     # Enforce daily chat limit
     if not await asyncio.to_thread(increment_usage, current_user["user_id"], "chat"):
         def _limit():

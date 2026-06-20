@@ -1,6 +1,5 @@
 import asyncio
 import os
-import token
 from fastapi import APIRouter, Depends, HTTPException, Form, Request, Response
 import json
 from datetime import date
@@ -49,7 +48,7 @@ def _record_attempt(email: str, ip: str, success: bool):
 
 
 @router.post("/auth/login")
-@limiter.limit("1000/minute")
+@limiter.limit("10/minute")
 async def login(
     request:  Request,
     response: Response,
@@ -170,6 +169,8 @@ async def check_auth(
     current_user: dict = Depends(get_current_user),
 ):
     """Check if user_id is valid and get user details"""
+    if current_user["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     email = get_email_from_user_id(user_id)
 
     if not email:
@@ -198,7 +199,7 @@ async def refresh_token(
     from backend.core.config import ENVIRONMENT
     response.set_cookie(
         key="scholarly_token",
-        value=token,
+        value=new_token,
         httponly=True,
         secure=os.getenv("ENVIRONMENT", "development") != "development",
         samesite="lax",

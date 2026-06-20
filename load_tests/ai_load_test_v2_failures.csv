@@ -1,0 +1,2 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+POST,/quiz,CatchResponseError('quiz failed: 429'),3,2026-06-19T08:00:04Z,2026-06-19T08:00:13Z

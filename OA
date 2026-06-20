@@ -1,0 +1,44 @@
+[1mdiff --git a/backend/core/limiter.py b/backend/core/limiter.py[m
+[1mindex 1e1a7f5..1bb04b4 100644[m
+[1m--- a/backend/core/limiter.py[m
+[1m+++ b/backend/core/limiter.py[m
+[36m@@ -1,24 +1,24 @@[m
+ import os[m
+ from slowapi import Limiter[m
+ from slowapi.util import get_remote_address[m
+[31m-from limits.storage import MemoryStorage, RedisStorage[m
+ [m
+ REDIS_URL = os.getenv("REDIS_URL", "")[m
+ [m
+[31m-def _get_storage():[m
+[31m-    if REDIS_URL:[m
+[31m-        try:[m
+[31m-            storage = RedisStorage(REDIS_URL)[m
+[31m-            # Test connection[m
+[31m-            storage.check()[m
+[31m-            print("✅ Rate limiter using Redis storage")[m
+[31m-            return storage[m
+[31m-        except Exception as e:[m
+[31m-            print(f"⚠️  Rate limiter Redis unavailable — using memory: {e}")[m
+[31m-    return MemoryStorage()[m
+[32m+[m[32m# Use Redis if available, otherwise fall back to memory[m
+[32m+[m[32mif REDIS_URL:[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        import redis as _redis[m
+[32m+[m[32m        _test = _redis.Redis.from_url(REDIS_URL, socket_connect_timeout=2)[m
+[32m+[m[32m        _test.ping()[m
+[32m+[m[32m        _storage_uri = REDIS_URL[m
+[32m+[m[32m        print("✅ Rate limiter using Redis")[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        print(f"⚠️  Rate limiter Redis unavailable — using memory: {e}")[m
+[32m+[m[32m        _storage_uri = "memory://"[m
+[32m+[m[32melse:[m
+[32m+[m[32m    _storage_uri = "memory://"[m
+ [m
+ limiter = Limiter([m
+     key_func=get_remote_address,[m
+[31m-    storage_uri=None,[m
+[31m-    storage=_get_storage(),[m
+[32m+[m[32m    storage_uri=_storage_uri,[m
+ )[m
+\ No newline at end of file[m

@@ -2,8 +2,9 @@ from locust import HttpUser, task, between
 import random
 import json
 
-TEST_EMAIL    = "abhaymahaja097@gmail.com"
-TEST_PASSWORD = "abhi2004"
+import os
+TEST_EMAIL    = os.getenv("LOCUST_TEST_EMAIL", "test@example.com")
+TEST_PASSWORD = os.getenv("LOCUST_TEST_PASSWORD", "changeme")
 TEST_TOKEN    = ""  # filled after login
 
 

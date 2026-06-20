@@ -1,3 +1,14 @@
+import sys
+import io
+
+# Force UTF-8 stdout/stderr — prevents UnicodeEncodeError crashes on Windows
+# consoles (cp1252) when any print() contains emoji or non-ASCII characters.
+# Must run before any other import that might print at module load time.
+if sys.stdout.encoding != "utf-8":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+if sys.stderr.encoding != "utf-8":
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
 from contextlib import asynccontextmanager
 import os
 import sentry_sdk
@@ -5,7 +16,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-
 from backend.core.config import ALLOWED_ORIGINS, GROQ_API_KEY, LLM_MODEL
 from backend.db import init_db
 from backend.routes import auth_routes, profile_routes, chat_routes, quiz_routes, study_routes, knowledge_routes, referral_routes
@@ -76,14 +86,12 @@ app = FastAPI(title="ScholarlyAI API", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-from backend.core.config import ALLOWED_ORIGINS
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Referral-Code"],
 )
 
 app.include_router(auth_routes.router)

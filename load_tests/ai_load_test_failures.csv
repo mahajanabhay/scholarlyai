@@ -1,0 +1,3 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+POST,/quiz/generate,CatchResponseError('quiz_generate failed: 404'),22,2026-06-19T07:28:09Z,2026-06-19T07:30:31Z
+POST,/study-session/retry-weak,CatchResponseError('retry_weak failed: 500'),7,2026-06-19T07:28:28Z,2026-06-19T07:30:23Z

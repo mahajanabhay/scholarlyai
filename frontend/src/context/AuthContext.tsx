@@ -12,7 +12,6 @@
  *                        → { valid, user_id, email, name, avatar, bio }
  *
  * localStorage keys used across the app:
- *  scholarly_token    — JWT returned by login / register
  *  scholarly_user_id  — user_id returned by login / register
  *  scholarly_email    — email (convenience, read by some components)
  *  scholarly_name     — display name (convenience)
@@ -57,13 +56,7 @@ interface AuthContextType {
  * Do NOT set Content-Type here — FormData requests set their own boundary.
  */
 export function getAuthHeaders(): Record<string, string> {
-  const token =
-    typeof window !== 'undefined'
-      ? localStorage.getItem('scholarly_token')
-      : null;
-  return {
-    Authorization: `Bearer ${token ?? ''}`,
-  };
+  return {};
 }
 
 function persistSession(data: {
@@ -89,7 +82,6 @@ function persistSession(data: {
 }
 
 function clearSession(): void {
-  localStorage.removeItem('scholarly_token');
   localStorage.removeItem('scholarly_user_id');
   localStorage.removeItem('scholarly_email');
   localStorage.removeItem('scholarly_name');
@@ -117,9 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         if (res.ok) {
           const data = await res.json();
-          if (data?.token) {
-            localStorage.setItem('scholarly_token', data.token);
-          }
+          // cookie rotated server-side
         } else {
           clearSession();
           window.location.href = '/login';
@@ -173,7 +163,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await res.json();
-    if (data.token) localStorage.setItem('scholarly_token', data.token);
     setUser(persistSession(data));
   };
 
@@ -199,7 +188,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await res.json();
-    if (data.token) localStorage.setItem('scholarly_token', data.token);
     setUser(persistSession(data));
   };
 

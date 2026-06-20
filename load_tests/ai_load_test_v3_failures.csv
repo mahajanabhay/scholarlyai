@@ -1,0 +1,4 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+POST,/quiz,CatchResponseError('quiz failed: 429'),23,2026-06-19T08:00:38Z,2026-06-19T08:03:21Z
+POST,/study-session/retry-weak,CatchResponseError('retry_weak failed: 500'),3,2026-06-19T08:01:29Z,2026-06-19T08:01:39Z
+POST,/study-session/retry-weak,CatchResponseError('retry_weak failed: 429'),1,2026-06-19T08:02:04Z,2026-06-19T08:02:04Z

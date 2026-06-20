@@ -235,6 +235,8 @@ async def add_task_endpoint(
 
 @router.post("/planner/{user_id}/toggle/{task_id}")
 async def toggle_task_endpoint(user_id: str, task_id: int, current_user: dict = Depends(get_current_user)):
+    if user_id != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access forbidden.")
     task = toggle_task(user_id, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -245,6 +247,8 @@ async def toggle_task_endpoint(user_id: str, task_id: int, current_user: dict = 
 
 @router.post("/planner/{user_id}/delete/{task_id}")
 async def delete_task_endpoint(user_id: str, task_id: int, current_user: dict = Depends(get_current_user)):
+    if user_id != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access forbidden.")
     delete_task(user_id, task_id)
     return {"status": "deleted"}
 
@@ -458,7 +462,11 @@ async def verify_task_endpoint(
         raise HTTPException(status_code=500, detail="Verification failed. Please try again.")
 
 @router.post("/planner/{user_id}/generate")
-async def generate_daily_plan_endpoint(user_id: str, session_id: Optional[str] = Form(None), current_user: dict = Depends(get_current_user)):
+async def generate_daily_plan_endpoint(
+    user_id: str,
+    session_id: Optional[str] = Form(None),
+    current_user: dict = Depends(get_current_user)
+):
     """
     AI-generates exactly 3 tasks for today:
       1. A topic to study
@@ -467,6 +475,9 @@ async def generate_daily_plan_endpoint(user_id: str, session_id: Optional[str] =
     Uses the user's weak topics (if any) to personalise the plan.
     Returns the 3 newly created tasks.
     """
+    if user_id != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access forbidden.")
+
     weaknesses = get_weaknesses(user_id)
     weak_topics = list({w["topic"] for w in weaknesses[-5:]}) if weaknesses else []
 

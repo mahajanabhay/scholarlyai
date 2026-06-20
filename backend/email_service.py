@@ -89,3 +89,25 @@ def send_password_reset_email(to_email: str, name: str, token: str) -> bool:
     except Exception as e:
         print(f"❌ Failed to send reset email: {e}")
         return False
+    
+def _send_raw_email(to_email: str, name: str, subject: str, html_body: str) -> bool:
+    if not SMTP_USER or not SMTP_PASSWORD:
+        print(f"⚠️  Email not configured — skipping: {to_email}")
+        return False
+    from backend.core.config import APP_URL
+    html_body = html_body.replace("$APP_URL", APP_URL)
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = SMTP_USER
+    msg["To"]      = to_email
+    msg.attach(MIMEText(html_body, "html"))
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_USER, to_email, msg.as_string())
+        return True
+    except Exception as e:
+        print(f"❌ Failed to send email to {to_email}: {e}")
+        return False

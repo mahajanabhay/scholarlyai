@@ -267,7 +267,7 @@ export default function LandingPage() {
             </div>
           ))}
         </div>
-        <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.2)" }}>© 2025 OAL Studios</span>
+        <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.2)" }}>© {new Date().getFullYear()} OAL Studios</span>
       </footer>
 
     </div>

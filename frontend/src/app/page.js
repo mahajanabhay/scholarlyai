@@ -13,34 +13,27 @@ export default function HomePage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const uid   = localStorage.getItem("scholarly_user_id");
-    const token = localStorage.getItem("scholarly_token");
+    const uid = localStorage.getItem("scholarly_user_id");
 
-    // Redirect immediately if either credential is missing
-    if (!uid || !token) {
+    if (!uid) {
       router.push("/landing");
       return;
     }
 
-    // Verify token is still valid server-side — catches expired tokens
-    // and prevents a broken dashboard experience on 401 errors
     fetch(`${API_URL}/auth/check/${uid}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
     })
       .then((res) => {
         if (res.ok) {
           setIsAuthenticated(true);
         } else {
-          // Token expired or invalid — clear stale credentials and redirect
           localStorage.removeItem("scholarly_user_id");
-          localStorage.removeItem("scholarly_token");
           localStorage.removeItem("scholarly_email");
           localStorage.removeItem("scholarly_name");
           router.push("/login");
         }
       })
       .catch(() => {
-        // Network error — allow through so offline users aren't locked out
         setIsAuthenticated(true);
       })
       .finally(() => setIsLoading(false));

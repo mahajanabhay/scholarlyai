@@ -127,8 +127,8 @@ def register_user(email: str, name: str, password: str) -> tuple[bool, str]:
     if not email or not name or not password:
         return False, "All fields are required"
 
-    if len(password) < 6:
-        return False, "Password must be at least 6 characters"
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters"
 
     if user_exists(email):
         return False, "User already exists with this email"

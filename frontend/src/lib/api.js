@@ -3,10 +3,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 export { API_URL };
 
 export function getAuthHeaders() {
-  const token = typeof window !== "undefined"
-    ? localStorage.getItem("scholarly_token")
-    : null;
-  return { Authorization: `Bearer ${token ?? ""}` };
+  return {};
 }
 
 /**
@@ -43,7 +40,6 @@ export async function signupUser({ name, email, password }) {
     throw new Error(err.detail || "Signup failed");
   }
   const data = await res.json();
-  localStorage.setItem("scholarly_token",   data.token);
   localStorage.setItem("scholarly_user_id", data.user_id);
   localStorage.setItem("scholarly_email",   data.email);
   localStorage.setItem("scholarly_name",    data.name);
@@ -60,7 +56,6 @@ export async function loginUser({ email, password }) {
     throw new Error(err.detail || "Login failed");
   }
   const data = await res.json();
-  localStorage.setItem("scholarly_token",   data.token);
   localStorage.setItem("scholarly_user_id", data.user_id);
   localStorage.setItem("scholarly_email",   data.email);
   localStorage.setItem("scholarly_name",    data.name);

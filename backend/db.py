@@ -36,11 +36,11 @@ def _init_pool() -> None:
         # TEXT[] arrays. Without this psycopg2 passes lists as string literals,
         # causing type errors on any multi-item subject_focus array.
         extensions.register_adapter(list, _adapt_list_to_pg_array)
-        print("✅ Database connection pool created successfully")
+        print("Database connection pool created successfully")
     except Exception as e:
         connection_pool = None
-        print(f"❌ Failed to create connection pool: {e}")
-        print("⚠️  Database operations will fail until PostgreSQL is reachable.")
+        print(f"Failed to create connection pool: {e}")
+        print("Database operations will fail until PostgreSQL is reachable.")
 
 
 # Attempt pool creation at import time — workers that start before PG is ready
@@ -272,6 +272,11 @@ def init_db():
         """)
 
         cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_usage_limits_user_date
+            ON usage_limits (user_id, date)
+        """)
+
+        cursor.execute("""
         CREATE TABLE IF NOT EXISTS referrals (
             id            SERIAL PRIMARY KEY,
             referrer_id   TEXT NOT NULL,
@@ -283,8 +288,6 @@ def init_db():
             FOREIGN KEY (referrer_id) REFERENCES users(id) ON DELETE CASCADE
         )
         """)
-
-        conn.commit()
 
         conn.commit()
         print("✅ Database tables and indexes initialized successfully")

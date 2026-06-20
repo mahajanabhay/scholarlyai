@@ -15,7 +15,7 @@ export default function XPBar({ xpData }) {
       </div>
       <div className="h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-full transition-all duration-500"
+          className="h-full bg-linear-to-r from-amber-400 to-orange-500 rounded-full transition-all duration-500"
           style={{ width: `${pct}%` }}
         />
       </div>
