@@ -5,7 +5,7 @@
 ![Tech Stack](https://img.shields.io/badge/FastAPI-Backend-009688?style=flat) ![Next.js](https://img.shields.io/badge/Next.js-Frontend-000000?style=flat) ![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector_DB-orange?style=flat) ![Docker](https://img.shields.io/badge/Docker-Containerised-2496ED?style=flat)
 
 ## Live Demo
-🔗 [clarix.yourdomain.com](https://clarix.yourdomain.com) ← add after deployment
+🔗 Live demo coming soon
 
 ## What is Clarix?
 Clarix is a full-stack AI study platform that helps students learn smarter. Upload your study material, get RAG-grounded explanations, take adaptive quizzes, and let the AI identify your weak areas and build a personalised revision plan.
@@ -44,4 +44,4 @@ load_tests/   # Locust load testing config
 .github/      # CI/CD workflows
 
 ## Status
-🚧 Beta — actively developed. Deployment coming soon. ← update when live
+🚧 Beta — actively developed.
