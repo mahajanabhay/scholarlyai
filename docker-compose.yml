@@ -7,9 +7,15 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      CHROMA_HOST: chroma
+      CHROMA_PORT: 8001
     depends_on:
       - db
       - redis
+      - chroma
+    volumes:
+      - knowledge_uploads:/app/knowledge_uploads
 
   db:
     image: postgres:15
@@ -27,5 +33,14 @@ services:
     ports:
       - "6379:6379"
 
+  chroma:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - chromadata:/chroma/chroma
+
 volumes:
   pgdata:
+  chromadata:
+  knowledge_uploads:

@@ -5,7 +5,7 @@ import {
   BookOpen, ChevronDown, ChevronUp, Zap, CheckCircle2,
   Target, Brain, ArrowRight, RotateCcw
 } from 'lucide-react';
-import { apiFetch, getAuthHeaders } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';

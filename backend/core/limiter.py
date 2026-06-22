@@ -5,9 +5,9 @@ from backend.core.config import REDIS_URL, ENVIRONMENT
 
 
 def get_user_or_ip(request: Request) -> str:
-    auth = request.headers.get("Authorization", "")
-    if auth.startswith("Bearer ") and len(auth) > 10:
-        return auth
+    token = request.cookies.get("scholarly_token")
+    if token and len(token) > 10:
+        return token
     return get_remote_address(request)
 
 

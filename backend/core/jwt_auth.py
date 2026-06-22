@@ -17,10 +17,12 @@ EXPIRY_DAYS = 7
 
 def create_token(user_id: str, email: str) -> str:
     """Create a JWT token for a user"""
+    now = datetime.utcnow()
     payload = {
         "user_id": user_id,
         "email":   email,
-        "exp":     datetime.utcnow() + timedelta(days=EXPIRY_DAYS),
+        "iat":     now,
+        "exp":     now + timedelta(days=EXPIRY_DAYS),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 

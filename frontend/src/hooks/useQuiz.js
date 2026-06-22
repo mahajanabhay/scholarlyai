@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { API_URL, getAuthHeaders } from '@/lib/api';
+import { API_URL, apiFetch } from '@/lib/api';
 
 export function useQuiz({ userId, currentSessionId, sessions, setSessions, awardXp, refreshNotifications, lastFeedbackWrong, setLastFeedbackWrong }) {
   const [quizType,                setQuizType]                = useState(null);
@@ -38,7 +38,7 @@ export function useQuiz({ userId, currentSessionId, sessions, setSessions, award
       fd.append('last_was_wrong',  lastFeedbackWrong ? 'true' : 'false');
       if (currentQuizQuestion) fd.append('last_question', currentQuizQuestion);
 
-      const res = await fetch(`${API_URL}/quiz`, { method: 'POST', headers: getAuthHeaders(), body: fd });
+      const res = await apiFetch(`${API_URL}/quiz`, { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`Quiz error ${res.status}`);
       const data = await res.json();
 
@@ -74,7 +74,7 @@ export function useQuiz({ userId, currentSessionId, sessions, setSessions, award
     try {
       const fd = new FormData();
       fd.append('session_id', `${userId}_${currentSessionId}`);
-      const res = await fetch(`${API_URL}/quiz/answers`, { method: 'POST', headers: getAuthHeaders(), body: fd });
+      const res = await apiFetch(`${API_URL}/quiz/answers`, { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`Answers error ${res.status}`);
       const data = await res.json();
       setPaperAnswers(data.answers);
@@ -89,7 +89,7 @@ export function useQuiz({ userId, currentSessionId, sessions, setSessions, award
     try {
       const fd = new FormData();
       fd.append('session_id', `${userId}_${currentSessionId}`);
-      await fetch(`${API_URL}/quiz/reset`, { method: 'POST', headers: getAuthHeaders(), body: fd });
+      await apiFetch(`${API_URL}/quiz/reset`, { method: 'POST', body: fd });
     } catch (err) {
       console.error('Error resetting quiz:', err);
     }

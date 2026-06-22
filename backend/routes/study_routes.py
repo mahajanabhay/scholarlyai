@@ -7,7 +7,6 @@ from fastapi import APIRouter, Form, Depends, HTTPException, Request
 from backend.core.limiter import limiter
 from backend.core.jwt_auth import get_current_user
 from backend.routes.profile_routes import _retry_log  # for retry verification logging
-from fastapi.params import Form
 
 from backend.routes.chat_routes import NON_ACADEMIC_REPLY, is_academic_query
 from backend.core.llm import client, LLM_MODEL
@@ -137,8 +136,7 @@ async def start_study_session(
 async def study_session_results(
     request: Request,
     subject:       str           = Form(...),
-    wrong_topics:  str           = Form("[]"),   # JSON list of question texts that were wrong
-    user_id:       Optional[str] = Form(None),
+    wrong_topics:  str           = Form("[]"),
     score:         int           = Form(0),
     total:         int           = Form(4),
     current_user: dict = Depends(get_current_user)
@@ -150,16 +148,16 @@ async def study_session_results(
         wrong_list = json.loads(wrong_topics)
         xp_earned = 0  # default — set inside the if block if user_id present
 
-        if user_id:
-            for q_text in wrong_list:
-                record_weakness(user_id, subject, q_text)
-            xp_earned = max(5, (score / max(total, 1)) * 50)
-            add_xp(user_id, int(xp_earned))
-            push_notification(
-                user_id,
-                f"📖 Study session on '{subject}' complete! Score: {score}/{total}. +{int(xp_earned)} XP",
-                "success" if score >= total // 2 else "warning",
-            )
+        uid = current_user["user_id"]
+        for q_text in wrong_list:
+            record_weakness(uid, subject, q_text)
+        xp_earned = max(5, (score / max(total, 1)) * 50)
+        add_xp(uid, int(xp_earned))
+        push_notification(
+            uid,
+            f"📖 Study session on '{subject}' complete! Score: {score}/{total}. +{int(xp_earned)} XP",
+            "success" if score >= total // 2 else "warning",
+        )
 
         # Generate a short feedback summary
         summary_prompt = (
@@ -198,9 +196,8 @@ async def study_session_results(
 async def study_session_retry_weak(
     request: Request,
     subject:                str           = Form(...),
-    weak_topic_questions:   str           = Form("[]"),   # JSON list of questions user got wrong
+    weak_topic_questions:   str           = Form("[]"),
     num_questions:          int           = Form(4),
-    user_id:                Optional[str] = Form(None),
     current_user: dict = Depends(get_current_user)
 ):
     """

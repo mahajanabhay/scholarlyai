@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { X, Pencil, Flame, Star, Lock, Check, ChevronRight, Zap, Trophy } from 'lucide-react';
-import { getAuthHeaders } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -44,7 +44,7 @@ export default function ProfilePanel({ userId, profileData: initialProfileData, 
 
   useEffect(() => {
     if (initialProfileData || !userId || userId === 'guest_user') return;
-    fetch(`${API_URL}/profile/${userId}`, { headers: getAuthHeaders() })
+    apiFetch(`${API_URL}/profile/${userId}`)
       .then(r => r.json())
       .then(d => { setProfile(d); setName(d.name ?? ''); setBio(d.bio ?? ''); setAvatar(d.avatar ?? '🎓'); })
       .catch(console.error);
@@ -54,7 +54,7 @@ export default function ProfilePanel({ userId, profileData: initialProfileData, 
     setSaving(true);
     const fd = new FormData();
     fd.append('name', name); fd.append('bio', bio); fd.append('avatar', avatar);
-    const r = await fetch(`${API_URL}/profile/${userId}`, { method: 'POST', headers: getAuthHeaders(), body: fd });
+    const r = await apiFetch(`${API_URL}/profile/${userId}`, { method: 'POST', body: fd });
     const d = await r.json();
     const updated = d.user ?? d;
     setProfile(updated);

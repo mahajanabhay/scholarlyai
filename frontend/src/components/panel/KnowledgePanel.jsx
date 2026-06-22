@@ -1,18 +1,19 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { Upload, Trash2, FileText, Loader2, BookOpen } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-export default function KnowledgePanel({ getAuthHeaders }) {
-  const [docs, setDocs]         = useState([]);
+export default function KnowledgePanel() {
+  const [docs, setDocs]           = useState([]);
   const [uploading, setUploading] = useState(false);
-  const [deleting, setDeleting]  = useState(null);
-  const [msg, setMsg]            = useState(null);
-  const fileRef                  = useRef();
+  const [deleting, setDeleting]   = useState(null);
+  const [msg, setMsg]             = useState(null);
+  const fileRef                   = useRef();
 
   const load = () =>
-    fetch(`${API_URL}/knowledge/documents`, { headers: getAuthHeaders() })
+    apiFetch(`${API_URL}/knowledge/documents`)
       .then(r => r.json())
       .then(d => setDocs(d.documents || []))
       .catch(() => {});
@@ -27,9 +28,8 @@ export default function KnowledgePanel({ getAuthHeaders }) {
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const r = await fetch(`${API_URL}/knowledge/upload`, {
+      const r = await apiFetch(`${API_URL}/knowledge/upload`, {
         method: "POST",
-        headers: getAuthHeaders(),
         body: fd,
       });
       const d = await r.json();
@@ -48,9 +48,8 @@ export default function KnowledgePanel({ getAuthHeaders }) {
     setDeleting(filename);
     setMsg(null);
     try {
-      const r = await fetch(`${API_URL}/knowledge/documents/${encodeURIComponent(filename)}`, {
+      const r = await apiFetch(`${API_URL}/knowledge/documents/${encodeURIComponent(filename)}`, {
         method: "DELETE",
-        headers: getAuthHeaders(),
       });
       const d = await r.json();
       if (!r.ok) { setMsg({ ok: false, text: d.detail || "Delete failed." }); return; }
@@ -65,19 +64,16 @@ export default function KnowledgePanel({ getAuthHeaders }) {
 
   return (
     <div className="flex flex-col h-full p-6 space-y-5">
-
-      {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center">
           <BookOpen size={18} className="text-violet-500" />
         </div>
         <div>
           <h2 className="text-sm font-bold text-zinc-900 dark:text-white">Knowledge Base</h2>
-          <p className="text-xs text-zinc-500">Shared PDFs available to all users</p>
+          <p className="text-xs text-zinc-500">Upload PDFs for AI to reference</p>
         </div>
       </div>
 
-      {/* Upload */}
       <button
         onClick={() => fileRef.current?.click()}
         disabled={uploading}
@@ -85,19 +81,16 @@ export default function KnowledgePanel({ getAuthHeaders }) {
       >
         {uploading
           ? <><Loader2 size={15} className="animate-spin" /> Ingesting...</>
-          : <><Upload size={15} /> Upload PDF</>
-        }
+          : <><Upload size={15} /> Upload PDF</>}
       </button>
       <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={upload} />
 
-      {/* Feedback */}
       {msg && (
         <p className={`text-xs font-semibold ${msg.ok ? "text-green-500" : "text-red-400"}`}>
           {msg.text}
         </p>
       )}
 
-      {/* Document list */}
       <div className="flex-1 overflow-y-auto space-y-2">
         {docs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-zinc-400 space-y-2">
@@ -106,10 +99,7 @@ export default function KnowledgePanel({ getAuthHeaders }) {
           </div>
         ) : (
           docs.map(doc => (
-            <div
-              key={doc}
-              className="flex items-center gap-3 p-3 rounded-xl bg-zinc-50 dark:bg-white/3 border border-zinc-100 dark:border-white/6 group"
-            >
+            <div key={doc} className="flex items-center gap-3 p-3 rounded-xl bg-zinc-50 dark:bg-white/3 border border-zinc-100 dark:border-white/6 group">
               <FileText size={15} className="text-violet-400 shrink-0" />
               <span className="flex-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">{doc}</span>
               <button
@@ -117,16 +107,12 @@ export default function KnowledgePanel({ getAuthHeaders }) {
                 disabled={deleting === doc}
                 className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-red-400"
               >
-                {deleting === doc
-                  ? <Loader2 size={14} className="animate-spin" />
-                  : <Trash2 size={14} />
-                }
+                {deleting === doc ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
               </button>
             </div>
           ))
         )}
       </div>
-
     </div>
   );
 }

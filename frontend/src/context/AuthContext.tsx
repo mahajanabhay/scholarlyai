@@ -15,6 +15,8 @@
  *  scholarly_user_id  — user_id returned by login / register
  *  scholarly_email    — email (convenience, read by some components)
  *  scholarly_name     — display name (convenience)
+ *
+ * Auth token is stored in httpOnly cookie — never in localStorage.
  */
 
 import React, {
@@ -97,36 +99,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
 
-  const refreshIfNeeded = async (token: string) => {
+  const refreshIfNeeded = async () => {
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const expiresIn = payload.exp * 1000 - Date.now();
-      if (expiresIn < 2 * 24 * 60 * 60 * 1000) {
-        const res = await fetch(`${API_URL}/auth/refresh`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          // cookie rotated server-side
-        } else {
-          clearSession();
-          window.location.href = '/login';
-        }
+      const res = await fetch(`${API_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        clearSession();
+        window.location.href = '/login';
       }
     } catch {
-      // Malformed token — ignore
+      // Network error — ignore
     }
   };
 
   // On mount: verify any stored token against /auth/check
   useEffect(() => {
     const userId = localStorage.getItem('scholarly_user_id');
-    const token  = localStorage.getItem('scholarly_token');
     if (!userId) { setIsLoading(false); return; }
-    if (token) refreshIfNeeded(token);
-
+    refreshIfNeeded();
     fetch(`${API_URL}/auth/check/${userId}`, { credentials: "include" })
       .then(res => res.ok ? res.json() : null)
       .then(data => {

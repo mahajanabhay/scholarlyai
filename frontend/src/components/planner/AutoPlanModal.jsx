@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { apiFetch, getAuthHeaders } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 

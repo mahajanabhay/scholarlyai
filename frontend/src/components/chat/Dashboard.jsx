@@ -18,13 +18,12 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import {
   Send, Paperclip, X, Sun, Moon, GraduationCap, User, Bot, LogOut, Settings, MoreHorizontal,
-  Plus, Menu, ChevronDown, Eye, Search, Timer, Bookmark, Copy, Check, 
+  Plus, Menu, ChevronDown, Eye, Search, Timer, Bookmark, BookmarkCheck, Copy, Check,
   RotateCcw, Pencil, Clock, Coffee,
   Code2, Zap, Star, Flame, Trophy, Bell, BellOff, Calendar,
   Trash2, RefreshCw, AlertTriangle, ChevronRight, BookOpen,
   CheckCircle2, Circle, BarChart2, Shield, LineChart, TrendingUp
 } from 'lucide-react';
-
 import {
   mdComponents,
   codeMdComponents,
@@ -33,7 +32,7 @@ import EmptyStateActions from "@/components/chat/EmptyStateActions";
 import QuizCard from "@/components/quiz/QuizCard";
 import FeedbackCard from "@/components/quiz/FeedbackCard";
 import PomodoroTimer from "@/components/common/PomodoroTimer";
-import { API_URL, getAuthHeaders, apiFetch } from "@/lib/api";
+import { API_URL, apiFetch } from "@/lib/api";
 import { useQuiz } from "@/hooks/useQuiz";
 import { SUBJECTS } from "@/lib/constants";
 import { trackEvent, Events } from "@/lib/analytics";
@@ -84,6 +83,7 @@ export default function Dashboard() {
   const [quizType, setQuizType]             = useState(null);
   const [isQuizTypeDropdownOpen, setIsQuizTypeDropdownOpen] = useState(false);
   const [isQuizActive, setIsQuizActive]     = useState(false);
+  const [inputError, setInputError] = useState(null);
   const [currentQuizQuestion, setCurrentQuizQuestion] = useState(null);
   const [questionNumber, setQuestionNumber] = useState(1);
   const [isQuestionAnswered, setIsQuestionAnswered] = useState(false);
@@ -124,12 +124,12 @@ export default function Dashboard() {
   // ── Hydration ──────────────────────────────
   useEffect(() => {
     const uid   = localStorage.getItem("scholarly_user_id");
-    const token = localStorage.getItem("scholarly_token");
+    const token = null; // auth via httpOnly cookie
 
     // If either credential is missing, redirect to login immediately.
     // This is a defence-in-depth guard — page.js already checks, but
     // direct /dashboard navigation or a cleared token should still redirect.
-    if (!uid || !token) {
+    if (!uid) {
       router.replace("/login");
       return;
     }
@@ -455,7 +455,7 @@ export default function Dashboard() {
       const fd = new FormData();
       fd.append('session_id', `${userId}_${currentSessionId}`);
       fd.append('paper_content', paperContent);
-      const res = await fetch(`${API_URL}/quiz/answers`, { method: 'POST', headers: getAuthHeaders(), body: fd });
+      const res = await fetch(`${API_URL}/quiz/answers`, { method: 'POST', credentials: "include", body: fd });
       if (!res.ok) throw new Error(`Answers error ${res.status}`);
       const data = await res.json();
       setPaperAnswers(prev => ({ ...prev, [msgId]: data.answers }));
@@ -468,6 +468,7 @@ export default function Dashboard() {
 
   // ── Regular chat send ──────────────────────
   const handleSend = async (overrideMessage = null) => {
+    setInputError(null);
     const activeMessage = overrideMessage ?? message;
     if (!activeMessage.trim() && files.length === 0) return;
 
@@ -479,25 +480,21 @@ export default function Dashboard() {
 
     // Validate message length
     if (message.length > MAX_MESSAGE_LENGTH) {
-      alert(`Message exceeds ${MAX_MESSAGE_LENGTH} character limit`);
-      return;
+      setInputError(`Message exceeds ${MAX_MESSAGE_LENGTH} character limit`); return;
     }
 
     // Validate file count
     if (files.length > MAX_FILES) {
-      alert(`Maximum ${MAX_FILES} files allowed`);
-      return;
+      setInputError(`Maximum ${MAX_FILES} files allowed`); return;
     }
 
     // Validate file sizes and types
     for (const file of files) {
       if (file.size > MAX_FILE_SIZE) {
-        alert(`File "${file.name}" exceeds 50MB limit`);
-        return;
+        setInputError(`File "${file.name}" exceeds 50MB limit`); return;
       }
       if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-        alert(`File type "${file.type}" not allowed. Allowed: PDF, TXT, PNG, JPEG`);
-        return;
+        setInputError(`File type not allowed. Allowed: PDF, TXT, PNG, JPEG`); return;
       }
     }
 
@@ -947,7 +944,7 @@ export default function Dashboard() {
 
                     {/* Log out */}
                     <button
-                      onClick={() => { localStorage.removeItem('scholarly_token'); localStorage.removeItem('scholarly_user_id'); localStorage.removeItem('scholarly_email'); localStorage.removeItem('scholarly_name'); window.location.href = '/login'; }}
+                      onClick={() => { localStorage.removeItem('scholarly_user_id'); localStorage.removeItem('scholarly_email'); localStorage.removeItem('scholarly_name'); window.location.href = '/login'; }}
                       className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-zinc-100 dark:hover:bg-white/5 transition-all"
                     >
                       <LogOut size={16} className="text-red-400 shrink-0" />
@@ -1289,6 +1286,9 @@ export default function Dashboard() {
                 </div>
               ))}
 
+              {inputError && (
+                <div className="text-xs text-red-400 mb-2 px-1">{inputError}</div>
+              )}
               {(!isQuizActive || quizType === "paper") ? (
                 <div className={`flex items-end gap-2 p-3 rounded-2xl border transition-all duration-200 shadow-sm focus-within:shadow-lg ${mode === 'CODE' ? 'bg-[#0d1a12] border-emerald-800/60 focus-within:border-emerald-600/60' : 'bg-white dark:bg-white/3 border-zinc-300 dark:border-white/8 focus-within:border-violet-500 dark:focus-within:border-violet-500/40 focus-within:shadow-lg focus-within:shadow-violet-200 dark:focus-within:shadow-violet-900/10'}`}>
                   <label className="p-2 cursor-pointer">
@@ -1408,7 +1408,7 @@ export default function Dashboard() {
             >
               <X size={16} />
             </button>
-            <KnowledgePanel getAuthHeaders={getAuthHeaders} />
+            <KnowledgePanel />
           </div>
         </div>
       )}
@@ -1690,7 +1690,7 @@ export default function Dashboard() {
                   <div className="py-4 border-b border-zinc-100 dark:border-white/6">
                     <p className="text-xs text-zinc-400 dark:text-zinc-600 uppercase tracking-widest font-bold mb-3">Danger Zone</p>
                     <button
-                      onClick={() => { localStorage.removeItem('scholarly_token'); localStorage.removeItem('scholarly_user_id'); localStorage.removeItem('scholarly_email'); localStorage.removeItem('scholarly_name'); window.location.href = '/login'; }}
+                      onClick={() => { localStorage.removeItem('scholarly_user_id'); localStorage.removeItem('scholarly_email'); localStorage.removeItem('scholarly_name'); window.location.href = '/login'; }}
                       className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-red-400 hover:text-red-300 transition-all"
                       style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}
                     >

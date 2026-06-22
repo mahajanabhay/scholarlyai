@@ -1,3 +1,5 @@
+import os
+
 import psycopg2
 
 conn = psycopg2.connect(
@@ -5,7 +7,7 @@ conn = psycopg2.connect(
     port=5432,
     dbname="scholarly_ai",
     user="scholarly_user",
-    password="abhay7227"  # replace with your DB_PASSWORD from .env
+    password=os.environ.get("DB_PASSWORD")  # replace with your DB_PASSWORD from .env
 )
 conn.autocommit = True
 cur = conn.cursor()

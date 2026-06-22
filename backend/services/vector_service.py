@@ -42,6 +42,8 @@ _db_cache: OrderedDict[str, Chroma] = OrderedDict()
 _quiz_memory: dict[str, dict] = {}
 
 def get_vector_db(session_id: str) -> Chroma:
+    # Sanitise session_id to prevent path traversal
+    session_id = session_id.replace("/", "_").replace("\\", "_").replace("..", "_")
     if session_id in _db_cache:
         _db_cache.move_to_end(session_id)
         return _db_cache[session_id]

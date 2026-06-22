@@ -191,27 +191,28 @@ def authenticate_user(email: str, password: str) -> tuple[bool, str, User]:
 # ─────────────────────────────────────────────
 
 def get_user_id_from_email(email: str) -> str | None:
-    """Get the persistent user_id for an email. Returns None if user doesn't exist."""
     email = email.lower().strip()
-
     conn = get_connection()
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
         row = cursor.fetchone()
         return row[0] if row else None
+    except Exception as e:
+        print(f"⚠️ get_user_id_from_email error: {e}")
+        return None
     finally:
         release_connection(conn)
 
-def get_email_from_user_id(user_id: str) -> str:
-    """Get email from user_id (reverse lookup)"""
+def get_email_from_user_id(user_id: str) -> str | None:
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        
         cursor.execute("SELECT email FROM users WHERE id = %s", (user_id,))
         row = cursor.fetchone()
-        
         return row[0] if row else None
+    except Exception as e:
+        print(f"⚠️ get_email_from_user_id error: {e}")
+        return None
     finally:
         release_connection(conn)

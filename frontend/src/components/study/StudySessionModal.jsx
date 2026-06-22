@@ -1,7 +1,7 @@
 "use client";
 import { useState } from 'react';
 import { GraduationCap, AlertTriangle, X } from 'lucide-react';
-import { getAuthHeaders } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -31,12 +31,10 @@ export default function StudySessionModal({ userId, onClose, onStartQuiz }) {
     if (!finalSubject) return;
     setLoading(true);
     setStep('running');
-    const res = await fetch(`${API_URL}/quiz/session`, {
-      method: 'POST', headers: getAuthHeaders()
-    });
-    const { session_id } = await res.json();
-    setSessionId(session_id);
-    await fetchNextQuestion(null, null, 1, true, session_id);
+    const sid = `study_${userId}_${Date.now()}`;
+    setSessionId(sid);
+    const data = await fetchNextQuestion(null, null, 1, true, sid);
+    if (data?.new_question) setQuestions([data.new_question]);
     setLoading(false);
   };
 
@@ -51,7 +49,7 @@ export default function StudySessionModal({ userId, onClose, onStartQuiz }) {
     fd.append('user_id',         userId);
     fd.append('last_was_wrong',  'false');
     if (prevQ) fd.append('last_question', prevQ);
-    const r    = await fetch(`${API_URL}/quiz`, { method: 'POST', headers: getAuthHeaders(), body: fd });
+    const r    = await apiFetch(`${API_URL}/quiz`, { method: 'POST', body: fd });
     const data = await r.json();
     return data;
   };
@@ -72,14 +70,14 @@ export default function StudySessionModal({ userId, onClose, onStartQuiz }) {
     fd.append('user_id',         userId);
     fd.append('last_question',   qText);
     fd.append('last_was_wrong',  'false');
-    const r    = await fetch(`${API_URL}/quiz`, { method: 'POST', headers: getAuthHeaders(), body: fd });
+    const r    = await apiFetch(`${API_URL}/quiz`, { method: 'POST', body: fd });
     const data = await r.json();
 
     const fb = data.feedback || '';
     const newFeedbacks = [...feedbacks, fb];
     setFeedbacks(newFeedbacks);
 
-    const wrong = data.is_correct === false;
+    const wrong = fb.toLowerCase().includes('incorrect') || fb.toLowerCase().includes('wrong') || fb.toLowerCase().includes('not correct');
     if (wrong) setWeakTopics(prev => [...prev, finalSubject]);
 
     if (currentQ + 1 < TOTAL) {

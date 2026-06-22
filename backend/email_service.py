@@ -10,7 +10,7 @@ from backend.core.config import SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, 
 def send_verification_email(to_email: str, name: str, token: str) -> bool:
     """Send verification email. Returns True on success."""
     if not SMTP_USER or not SMTP_PASSWORD:
-        print(f"⚠️  Email not configured — verify token for {to_email}: {token}")
+        print(f"⚠️  Email not configured — skipping verification email for {to_email}")
         return False
 
     verify_url = f"{APP_URL}/verify-email?token={token}"
@@ -51,7 +51,7 @@ def send_verification_email(to_email: str, name: str, token: str) -> bool:
     
 def send_password_reset_email(to_email: str, name: str, token: str) -> bool:
     if not SMTP_USER or not SMTP_PASSWORD:
-        print(f"⚠️  Reset token for {to_email}: {token}")
+        print(f"⚠️  Email not configured — skipping password reset email for {to_email}")
         return False
 
     reset_url = f"{APP_URL}/reset-password?token={token}"

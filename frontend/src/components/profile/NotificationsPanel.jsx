@@ -28,9 +28,7 @@ export default function NotificationsPanel({ userId, onClose, onRead }) {
   }, [onClose]);
 
   const markRead = async () => {
-    await fetch(`${API_URL}/notifications/${userId}/read`, {
-      method: 'POST', headers: getAuthHeaders(),
-    });
+    await apiFetch(`${API_URL}/notifications/${userId}/read`, { method: 'POST' });
     onRead();
   };
 

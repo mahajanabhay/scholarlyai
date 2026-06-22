@@ -43,6 +43,9 @@ def _record_attempt(email: str, ip: str, success: bool):
             (email.lower(), ip, success)
         )
         conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f"⚠️ Failed to record login attempt: {e}")
     finally:
         release_connection(conn)
 
