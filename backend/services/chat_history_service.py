@@ -24,7 +24,7 @@ def save_message(user_id: str, session_id: str, role: str, content: str, mode: s
             VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
         """, (user_id, session_id, role, content, mode))
         conn.commit()
-        print(f"✅ Message saved: {user_id[:8]}:{session_id[:8]} [{role}] {len(content)} chars")
+        pass
     except Exception as e:
         conn.rollback()
         print(f"⚠️  Failed to save message for {user_id}: {e}")
@@ -71,7 +71,7 @@ def load_history(user_id: str, session_id: str, limit: int = 20) -> list:
             for r in rows
         ]
         
-        print(f"✅ Loaded {len(history)} messages for {user_id[:8]}:{session_id[:8]}")
+        pass
         return history
         
     except Exception as e:

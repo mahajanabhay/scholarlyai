@@ -1,0 +1,29 @@
+Project: ScholarlyAI
+
+An AI-powered study assistant focused on:
+
+* personalized study workflows
+* quizzes
+* weakness tracking
+* revision planning
+* XP/streak progression
+* planner/task systems
+* conversational AI learning
+
+Current focus:
+
+* production stabilization
+* auth/session reliability
+* frontend/backend sync
+* persistence consistency
+* streaming stability
+* retention workflow quality
+
+Main concerns:
+
+* dashboard complexity
+* mixed persistence layers
+* JWT/session handling
+* streak reliability
+* production readiness
+* scaling risks
