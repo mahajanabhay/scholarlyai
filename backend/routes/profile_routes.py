@@ -222,6 +222,8 @@ async def add_task_endpoint(
     due_time: Optional[str] = Form(None),
     current_user: dict = Depends(get_current_user)
 ):
+    if user_id != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access forbidden.")
     task = {
         "id": int(datetime.utcnow().timestamp() * 1000),
         "title": title,

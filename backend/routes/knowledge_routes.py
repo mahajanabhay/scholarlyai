@@ -66,6 +66,10 @@ async def upload_document(
     upload_dir = _user_upload_dir(user_id)
     session_id = _user_session(user_id)
 
+    existing = glob.glob(os.path.join(upload_dir, "*.pdf"))
+    if len(existing) >= 20:
+        raise HTTPException(status_code=400, detail="Maximum 20 documents per user. Delete some to upload more.")
+
     save_path = os.path.join(upload_dir, safe_name)
     with open(save_path, "wb") as f:
         f.write(content)

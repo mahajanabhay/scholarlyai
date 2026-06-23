@@ -191,7 +191,6 @@ def add_xp(user_id: str, amount: int):
     try:
         upsert_xp(user_id, xp)
         cache_set(f"xp:{user_id}", xp)
-        print(f"✅ [xp] saved user={user_id} total={xp['total']} level={xp['level']}")
     except Exception as e:
         print(f"⚠️ [xp] DB upsert failed for {user_id}: {e}")
 

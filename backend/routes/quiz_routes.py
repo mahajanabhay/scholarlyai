@@ -267,7 +267,6 @@ async def quiz_endpoint(
     question_number: int           = Form(1),
     last_question:   Optional[str] = Form(None),
     is_starting:     str           = Form("false"),
-    user_id:         Optional[str] = Form(None),
     last_was_wrong:  str           = Form("false"),
     current_user:    dict          = Depends(get_current_user),
 ):
@@ -314,14 +313,14 @@ async def quiz_endpoint(
             print(f"✅ Quiz started on topic: '{message}' → Expanded: '{expanded_topic}'")
 
         # ── Record weakness if the previous answer was wrong ──
-        if user_id and last_was_wrong.lower() == "true" and last_question and quiz_mem.get("quiz_topic"):
-            record_weakness(user_id, quiz_mem["quiz_topic"], last_question)
+        if last_was_wrong.lower() == "true" and last_question and quiz_mem.get("quiz_topic"):
+            record_weakness(current_user["user_id"], quiz_mem["quiz_topic"], last_question)
             push_notification(
-                user_id,
+                current_user["user_id"],
                 f"🎯 Weakness recorded in '{quiz_mem['quiz_topic']}' — auto-revision scheduled.",
                 "warning",
             )
-            print(f"📊 Weakness tracked for user '{user_id}' in '{quiz_mem['quiz_topic']}'")
+            print(f"📊 Weakness tracked for user '{current_user['user_id']}' in '{quiz_mem['quiz_topic']}'")
 
         feedback = ""
         if last_question and quiz_type == "single":

@@ -2,7 +2,8 @@
 Referral system — generate codes, track usage, reward referrers.
 """
 import secrets
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from backend.core.limiter import limiter
 from backend.core.jwt_auth import get_current_user
 from backend.db import get_connection, release_connection
 from backend.services.memory_service import add_xp, push_notification
@@ -13,7 +14,8 @@ REFERRAL_XP_REWARD = 100  # XP awarded to referrer on successful signup
 
 
 @router.post("/referral/generate")
-async def generate_referral_code(current_user: dict = Depends(get_current_user)):
+@limiter.limit("10/hour")
+async def generate_referral_code(request: Request, current_user: dict = Depends(get_current_user)):
     user_id = current_user["user_id"]
     conn = get_connection()
     try:
