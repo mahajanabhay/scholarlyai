@@ -4,7 +4,7 @@ import re
 # Logs retry-weak calls per user so the verify endpoint can confirm
 # revision tasks were actually completed via the Weakness Tracker.
 _retry_log: dict = {}
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from typing import Optional
 
@@ -225,12 +225,12 @@ async def add_task_endpoint(
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
     task = {
-        "id": int(datetime.utcnow().timestamp() * 1000),
+        "id": int(datetime.now(timezone.utc).timestamp() * 1000),
         "title": title,
         "subject": subject,
         "due_time": due_time,
         "done": False,
-        "created": datetime.utcnow().isoformat(),
+        "created": datetime.now(timezone.utc).isoformat(),
     }
     add_task(user_id, task)
     return {"task": task}
@@ -551,12 +551,12 @@ async def generate_daily_plan_endpoint(
     for i, t in enumerate(ai_tasks[:3]):
         icon = TYPE_ICONS.get(t.get("type", "study"), "📌")
         task = {
-            "id": int(datetime.utcnow().timestamp() * 1000) + i,
+            "id": int(datetime.now(timezone.utc).timestamp() * 1000) + i,
             "title": f"{icon} {t.get('title', 'Study task')}",
             "subject": t.get("subject", "General"),
             "due_time": None,
             "done": False,
-            "created": datetime.utcnow().isoformat(),
+            "created": datetime.now(timezone.utc).isoformat(),
             "ai_generated": True,
         }
         add_task(user_id, task)

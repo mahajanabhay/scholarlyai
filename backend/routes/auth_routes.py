@@ -8,7 +8,7 @@ from backend.core.jwt_auth import create_token, get_current_user
 from backend.core.limiter import limiter
 from backend.services.memory_service import get_streak, push_notification
 from backend.services.audit_service import audit
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 router = APIRouter()
 
@@ -27,7 +27,7 @@ def _check_brute_force(email: str, ip: str) -> bool:
             """SELECT COUNT(*) FROM login_attempts
                WHERE email = %s AND ip = %s AND success = FALSE
                AND created_at > %s""",
-            (email.lower(), ip, datetime.utcnow() - timedelta(minutes=LOCKOUT_MINUTES))
+            (email.lower(), ip, datetime.now(timezone.utc) - timedelta(minutes=LOCKOUT_MINUTES))
         )
         return cur.fetchone()[0] >= MAX_FAILED_ATTEMPTS
     finally:
@@ -282,7 +282,7 @@ async def forgot_password(request: Request, email: str = Form(...)):
             return {"status": "If that email exists, a reset link has been sent."}
 
         token     = secrets.token_urlsafe(32)
-        expires   = datetime.utcnow() + timedelta(hours=1)
+        expires   = datetime.now(timezone.utc) + timedelta(hours=1)
 
         cur.execute(
             "UPDATE users SET reset_token = %s, reset_token_expires_at = %s WHERE id = %s",

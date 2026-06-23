@@ -3,7 +3,7 @@ JWT Authentication Utility
 Handles token creation and verification
 """
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException, Header
 from typing import Optional
 from fastapi import Request
@@ -17,7 +17,7 @@ EXPIRY_DAYS = 7
 
 def create_token(user_id: str, email: str) -> str:
     """Create a JWT token for a user"""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     payload = {
         "user_id": user_id,
         "email":   email,

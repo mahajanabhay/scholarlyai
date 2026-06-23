@@ -231,16 +231,25 @@ Context:
         streaming response; this version lets them interleave freely.
         """
         try:
-            # Open the stream on a thread — the initial connection is blocking
-            response = await asyncio.to_thread(
-                client.chat.completions.create,
-                model=LLM_MODEL,
-                messages=messages,
-                max_tokens=MAX_TOKENS,
-                temperature=0.3,
-                stream=True,
-                timeout=120,
-            )
+            # Retry up to 3 times on rate limit errors
+            for _attempt in range(3):
+                try:
+                    response = await asyncio.to_thread(
+                        client.chat.completions.create,
+                        model=LLM_MODEL,
+                        messages=messages,
+                        max_tokens=MAX_TOKENS,
+                        temperature=0.3,
+                        stream=True,
+                        timeout=120,
+                    )
+                    break
+                except Exception as _e:
+                    _err = str(_e).lower()
+                    if ("rate" in _err or "429" in _err) and _attempt < 2:
+                        await asyncio.sleep(2 ** _attempt)
+                        continue
+                    raise
             # Each next() on the sync stream iterator is a blocking network
             # read — run every one on the thread pool.
             # NOTE: StopIteration cannot propagate through a Future/coroutine

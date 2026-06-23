@@ -41,7 +41,7 @@ class User:
     def from_dict(data):
         """Create user from dictionary"""
         user = User(data["email"], data["name"], data["password_hash"])
-        user.created_at = data.get("created_at", datetime.utcnow().isoformat())
+        user.created_at = data.get("created_at", datetime.now(timezone.utc).isoformat())
         user.avatar = data.get("avatar", "🎓")
         user.bio = data.get("bio", "")
         user.subject_focus = data.get("subject_focus", [])

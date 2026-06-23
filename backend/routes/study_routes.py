@@ -212,7 +212,7 @@ async def study_session_retry_weak(
             _retry_log[effective_uid] = []
         _retry_log[effective_uid].append({
             "subject":   subject,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         })
         # Keep only last 50 entries per user
         _retry_log[effective_uid] = _retry_log[effective_uid][-50:]

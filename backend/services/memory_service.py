@@ -1,5 +1,5 @@
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from collections import OrderedDict
 from backend.core.cache import get as cache_get, set as cache_set, delete as cache_delete
 
@@ -218,7 +218,7 @@ def record_weakness(user_id: str, topic: str, question: str):
     ws.append({
         "topic":       topic,
         "question":    question[:200],
-        "timestamp":   datetime.utcnow().isoformat(),
+        "timestamp":   datetime.now(timezone.utc).isoformat(),
         "retry_count": 0,
     })
     _weaknesses[user_id] = ws[-50:]
@@ -301,7 +301,7 @@ def push_notification(user_id: str, message: str, notif_type: str = "info"):
     ns.append({
         "message":   message,
         "type":      notif_type,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "read":      False,
     })
     # Archive old read notifications, keep last MAX_NOTIFICATIONS total

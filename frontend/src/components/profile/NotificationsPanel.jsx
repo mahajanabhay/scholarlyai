@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from 'react';
 import { Bell, CheckCircle2, AlertTriangle, X } from 'lucide-react';
-import { apiFetch, getAuthHeaders } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
