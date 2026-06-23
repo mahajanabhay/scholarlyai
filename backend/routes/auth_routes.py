@@ -316,7 +316,7 @@ async def reset_password(
             """SELECT id FROM users
                WHERE reset_token = %s
                AND reset_token_expires_at > %s""",
-            (token, datetime.now(datetime.UTC))
+            (token, datetime.now(timezone.utc))
         )
         row = cur.fetchone()
         if not row:
