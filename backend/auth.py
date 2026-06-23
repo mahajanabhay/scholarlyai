@@ -4,7 +4,7 @@ Handles login, registration, and user credential storage
 """
 import bcrypt
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from .db import get_connection, release_connection
 
 # ─────────────────────────────────────────────
@@ -20,7 +20,7 @@ class User:
         self.email = email
         self.name = name
         self.password_hash = password_hash
-        self.created_at = datetime.utcnow().isoformat()
+        self.created_at = datetime.now(timezone.utc).isoformat()
         self.avatar = "🎓"
         self.bio = ""
         self.subject_focus = []

@@ -8,6 +8,7 @@ from backend.core.jwt_auth import create_token, get_current_user
 from backend.core.limiter import limiter
 from backend.services.memory_service import get_streak, push_notification
 from backend.services.audit_service import audit
+from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -315,7 +316,7 @@ async def reset_password(
             """SELECT id FROM users
                WHERE reset_token = %s
                AND reset_token_expires_at > %s""",
-            (token, datetime.utcnow())
+            (token, datetime.now(datetime.UTC))
         )
         row = cur.fetchone()
         if not row:
