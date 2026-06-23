@@ -258,6 +258,7 @@ def expand_abbreviations(topic: str) -> str:
 @router.post("/quiz")
 @limiter.limit("20/minute")
 async def quiz_endpoint(
+    
     request: Request,
     message:          str           = Form(...),
     session_id:       str           = Form(...),
@@ -287,6 +288,7 @@ async def quiz_endpoint(
     - Expands shortforms in any case (ai, AI, Ai → Artificial Intelligence)
     """
     try:
+        session_id = session_id.replace("/", "_").replace("\\", "_").replace("..", "_")
         quiz_mem = get_quiz_memory(session_id)
         is_quiz_start = is_starting.lower() == "true"
         # Enforce daily quiz limit on new quiz starts only
@@ -561,6 +563,7 @@ async def get_answers_endpoint(
     Called when user requests to see answers.
     """
     try:
+        session_id = session_id.replace("/", "_").replace("\\", "_").replace("..", "_")
         quiz_mem = get_quiz_memory(session_id)
         
         if not quiz_mem["quiz_topic"]:
@@ -613,6 +616,7 @@ async def reset_quiz_endpoint(
     session_id:   str  = Form(...),
     current_user: dict = Depends(get_current_user),
 ):
+    session_id = session_id.replace("/", "_").replace("\\", "_").replace("..", "_")
     reset_quiz_memory(session_id)
     return {"status": "quiz_memory_cleared"}
 
