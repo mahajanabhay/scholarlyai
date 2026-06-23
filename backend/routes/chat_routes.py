@@ -294,6 +294,8 @@ async def chat_endpoint(
             status_code=400,
             detail=f"Message too long ({len(message)} chars). Maximum is {MAX_USER_MESSAGE_LEN} characters."
         )
+    # Sanitise session_id to prevent path traversal into Chroma dirs
+    session_id = session_id.replace("/", "_").replace("\\", "_").replace("..", "_")
 
     trigger_template = any(
         word in message.lower()

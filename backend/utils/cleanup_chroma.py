@@ -21,6 +21,9 @@ deleted, skipped = 0, 0
 for entry in CHROMA_BASE_DIR.iterdir():
     if not entry.is_dir():
         continue
+    # Never delete user knowledge base dirs — only loadtest/temp dirs
+    if entry.name.startswith("user_") or entry.name in ("shared", "test"):
+        continue
     if entry.stat().st_mtime < cutoff:
         shutil.rmtree(entry)
         print(f"🗑️  Deleted {entry.name}")

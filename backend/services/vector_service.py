@@ -39,7 +39,8 @@ def _get_embeddings() -> HuggingFaceEmbeddings:
 # ─────────────────────────────────────────────────────────────────────────
 _DB_CACHE_MAX = 50
 _db_cache: OrderedDict[str, Chroma] = OrderedDict()
-_quiz_memory: dict[str, dict] = {}
+_QUIZ_MEMORY_MAX = 200
+_quiz_memory: OrderedDict[str, dict] = OrderedDict()
 
 def get_vector_db(session_id: str) -> Chroma:
     # Sanitise session_id to prevent path traversal
@@ -68,8 +69,12 @@ def get_vector_db(session_id: str) -> Chroma:
     return _db_cache[session_id]
 
 def get_quiz_memory(session_id: str) -> dict:
-    if session_id not in _quiz_memory:
-        _quiz_memory[session_id] = {
+    if session_id in _quiz_memory:
+        _quiz_memory.move_to_end(session_id)
+        return _quiz_memory[session_id]
+    if len(_quiz_memory) >= _QUIZ_MEMORY_MAX:
+        _quiz_memory.popitem(last=False)
+    _quiz_memory[session_id] = {
             "asked_questions": [],
             "asked_topics": [],
             "quiz_topic": None,
