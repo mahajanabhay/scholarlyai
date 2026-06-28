@@ -46,10 +46,10 @@ def get_current_user(
     """
     Accepts token from httpOnly cookie OR Authorization header (fallback).
     """
-    # 1. Try httpOnly cookie first
-    token = request.cookies.get("scholarly_token")
+    # 1. Try Authorization header first
+    token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
 
-    # 2. Fall back to Bearer header
+    # 2. Fall back to HTTPBearer scheme
     if not token and credentials:
         token = credentials.credentials
 

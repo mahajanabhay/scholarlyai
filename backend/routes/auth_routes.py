@@ -62,11 +62,11 @@ async def login(
     """Login user — max 10 attempts per minute per IP"""
     ip = request.client.host if request.client else "unknown"
 
-    if _check_brute_force(email, ip):
+    if await asyncio.to_thread(_check_brute_force, email, ip):
         raise HTTPException(status_code=429, detail=f"Too many failed attempts. Account locked for {LOCKOUT_MINUTES} minutes.")
 
     success, message, user = await asyncio.to_thread(authenticate_user, email, password)
-    _record_attempt(email, ip, success)
+    await asyncio.to_thread(_record_attempt, email, ip, success)
 
     if not success:
         audit(None, "login_failed", f"email={email}", ip)
@@ -185,12 +185,13 @@ async def check_auth(
         raise HTTPException(status_code=404, detail="User not found")
 
     return {
-        "valid":   True,
-        "user_id": user_id,
-        "email":   email,
-        "name":    user.name,
-        "avatar":  user.avatar,
-        "bio":     user.bio,
+        "valid":         True,
+        "user_id":       user_id,
+        "email":         email,
+        "name":          user.name,
+        "avatar":        user.avatar,
+        "bio":           user.bio,
+        "subject_focus": user.subject_focus or [],
     }
 
 @router.post("/auth/refresh")

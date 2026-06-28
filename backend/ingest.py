@@ -18,25 +18,21 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from backend.core.config import CHROMA_BASE_DIR, EMBED_MODEL
+from backend.services.vector_service import get_vector_db
 
 # Lock for concurrent access to vector store
-_ingest_lock = threading.Lock()
+import collections
+_ingest_locks: dict = {}
+_ingest_locks_lock = threading.Lock()
+
+def _get_session_lock(session_id: str) -> threading.Lock:
+    with _ingest_locks_lock:
+        if session_id not in _ingest_locks:
+            _ingest_locks[session_id] = threading.Lock()
+        return _ingest_locks[session_id]
 
 
 def ingest_pdfs(pdf_dir: str, session_id: str = "shared") -> None:
-    """
-    Ingest PDFs into the vector store for a specific session.
-    Uses a lock to prevent concurrent access issues.
-    """
-    persist_dir = os.path.join(CHROMA_BASE_DIR, session_id)
-    
-    # Validate session directory
-    try:
-        os.makedirs(persist_dir, exist_ok=True)
-    except Exception as e:
-        print(f"❌ Failed to create session directory '{persist_dir}': {e}")
-        return
-
     pdf_files = glob.glob(os.path.join(pdf_dir, "*.pdf"))
     if not pdf_files:
         print(f"⚠️  No PDF files found in '{pdf_dir}'")
@@ -44,15 +40,11 @@ def ingest_pdfs(pdf_dir: str, session_id: str = "shared") -> None:
 
     print(f"--- Found {len(pdf_files)} PDF(s) in '{pdf_dir}' ---")
 
-    # Use lock to prevent concurrent access to vector store
-    with _ingest_lock:
+    with _get_session_lock(session_id):
         try:
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-            embeddings    = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
-            vector_db     = Chroma(persist_directory=persist_dir, embedding_function=embeddings)
-
+            vector_db = get_vector_db(session_id)
             for pdf_path in pdf_files:
-                print(f"  Loading: {pdf_path}")
                 try:
                     loader = PyPDFLoader(pdf_path)
                     docs   = loader.load()
@@ -61,8 +53,7 @@ def ingest_pdfs(pdf_dir: str, session_id: str = "shared") -> None:
                     print(f"  ✅ Indexed {len(chunks)} chunks from {os.path.basename(pdf_path)}")
                 except Exception as e:
                     print(f"  ❌ Failed to index {pdf_path}: {e}")
-
-            print(f"\n✅ Done — all PDFs saved to session '{session_id}' at {persist_dir}")
+            print(f"\n✅ Done — session '{session_id}'")
         except Exception as e:
             print(f"❌ Error during PDF ingestion: {e}")
 

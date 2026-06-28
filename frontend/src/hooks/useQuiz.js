@@ -9,7 +9,7 @@ export function useQuiz({ userId, currentSessionId, sessions, setSessions, award
   const [questionNumber,          setQuestionNumber]          = useState(1);
   const [isQuestionAnswered,      setIsQuestionAnswered]      = useState(false);
   const [paperAnswers,            setPaperAnswers]            = useState(null);
-  const [isLoadingAnswers,        setIsLoadingAnswers]        = useState(false);
+  const [isLoadingAnswers,        setIsLoadingAnswers]        = useState({});
   const [isLoading,               setIsLoading]               = useState(false);
 
   const selectQuizType = (type) => {
@@ -21,7 +21,7 @@ export function useQuiz({ userId, currentSessionId, sessions, setSessions, award
     setIsQuestionAnswered(true);
     const userMsg = { role: 'user', content: `My answer: ${selectedLetter})`, id: Date.now() };
     setSessions(prev => ({ ...prev, [currentSessionId]: [...(prev[currentSessionId] || []), userMsg] }));
-    setTimeout(() => submitQuizAnswer(selectedLetter), 500);
+    await submitQuizAnswer(selectedLetter);
   };
 
   const submitQuizAnswer = async (answer) => {
@@ -57,7 +57,7 @@ export function useQuiz({ userId, currentSessionId, sessions, setSessions, award
       setCurrentQuizQuestion(data.new_question);
       setQuestionNumber(data.question_number);
       setIsQuestionAnswered(false);
-      await awardXp(wasWrong ? 5 : 15);
+      await awardXp(wasWrong ? 'message_sent' : 'quiz_correct');
       refreshNotifications();
     } catch (err) {
       console.error('Quiz error:', err);
@@ -69,19 +69,20 @@ export function useQuiz({ userId, currentSessionId, sessions, setSessions, award
     }
   };
 
-  const handleShowAnswers = async () => {
-    setIsLoadingAnswers(true);
+  const handleShowAnswers = async (msgId, paperContent) => {
+    setIsLoadingAnswers(prev => ({ ...prev, [msgId]: true }));
     try {
       const fd = new FormData();
       fd.append('session_id', `${userId}_${currentSessionId}`);
+      if (paperContent) fd.append('paper_content', paperContent);
       const res = await apiFetch(`${API_URL}/quiz/answers`, { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`Answers error ${res.status}`);
       const data = await res.json();
-      setPaperAnswers(data.answers);
+      setPaperAnswers(prev => ({ ...(prev || {}), [msgId]: data.answers }));
     } catch (err) {
       console.error('Error fetching answers:', err);
     } finally {
-      setIsLoadingAnswers(false);
+      setIsLoadingAnswers(prev => ({ ...prev, [msgId]: false }));
     }
   };
 
@@ -110,7 +111,7 @@ export function useQuiz({ userId, currentSessionId, sessions, setSessions, award
     questionNumber, setQuestionNumber,
     isQuestionAnswered, setIsQuestionAnswered,
     paperAnswers, setPaperAnswers,
-    isLoadingAnswers,
+    isLoadingAnswers, setIsLoadingAnswers,
     isLoading, setIsLoading,
     selectQuizType,
     handleOptionSelected,

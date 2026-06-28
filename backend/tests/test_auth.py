@@ -15,17 +15,15 @@ def test_verify_wrong_password():
     assert not verify_password("wrong", hashed)
 
 
-@patch("backend.auth.get_connection")
-def test_register_user_duplicate(mock_conn):
+def test_register_user_duplicate():
+    from backend.auth import register_user
+    conn = MagicMock()
     cur = MagicMock()
     cur.fetchone.return_value = ("existing@test.com",)
-    mock_conn.return_value.__enter__ = MagicMock(return_value=MagicMock(cursor=MagicMock(return_value=cur)))
-    mock_conn.return_value.__exit__ = MagicMock(return_value=False)
-    conn = MagicMock()
     conn.cursor.return_value = cur
-    mock_conn.return_value = conn
-    from backend.auth import register_user
-    # Duplicate email should fail gracefully
+
     with patch("backend.auth.get_connection", return_value=conn):
-        with patch("backend.db.get_connection", return_value=conn):
-            pass  # just ensure import doesn't crash
+        success, message = register_user("existing@test.com", "Test User", "password123")
+
+    assert success is False
+    assert "exist" in message.lower() or "duplicate" in message.lower() or "already" in message.lower()

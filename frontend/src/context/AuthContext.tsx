@@ -58,7 +58,8 @@ interface AuthContextType {
  * Do NOT set Content-Type here — FormData requests set their own boundary.
  */
 export function getAuthHeaders(): Record<string, string> {
-  return {};
+  const token = localStorage.getItem('scholarly_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 function persistSession(data: {
@@ -70,6 +71,7 @@ function persistSession(data: {
   bio: string;
   subject_focus: string[];
 }): User {
+  localStorage.setItem('scholarly_token', data.token);
   localStorage.setItem('scholarly_user_id', data.user_id);
   localStorage.setItem('scholarly_email', data.email);
   localStorage.setItem('scholarly_name', data.name);
@@ -84,6 +86,7 @@ function persistSession(data: {
 }
 
 function clearSession(): void {
+  localStorage.removeItem('scholarly_token');
   localStorage.removeItem('scholarly_user_id');
   localStorage.removeItem('scholarly_email');
   localStorage.removeItem('scholarly_name');
@@ -98,44 +101,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
 
+  // On mount: verify any stored token against /auth/check
+  // replace the useEffect in AuthProvider
 
-  const refreshIfNeeded = async () => {
+useEffect(() => {
+  const userId = localStorage.getItem('scholarly_user_id');
+  if (!userId) { setIsLoading(false); return; }
+
+  (async () => {
     try {
-      const res = await fetch(`${API_URL}/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include',
+      const res = await fetch(`${API_URL}/auth/check/${userId}`, {
+        headers: getAuthHeaders(),
       });
-      if (!res.ok) {
+      const data = res.ok ? await res.json() : null;
+      if (data?.valid) {
+        setUser({
+          id: data.user_id,
+          email: data.email,
+          name: data.name,
+          avatar: data.avatar ?? '🎓',
+          bio: data.bio ?? '',
+          subject_focus: data.subject_focus ?? [],
+        });
+      } else {
         clearSession();
-        window.location.href = '/login';
       }
     } catch {
-      // Network error — ignore
+      clearSession();
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  // On mount: verify any stored token against /auth/check
-  useEffect(() => {
-    const userId = localStorage.getItem('scholarly_user_id');
-    if (!userId) { setIsLoading(false); return; }
-    refreshIfNeeded();
-    fetch(`${API_URL}/auth/check/${userId}`, { credentials: "include" })
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.valid) {
-          setUser({ id: data.user_id, email: data.email, name: data.name,
-            avatar: data.avatar ?? '🎓', bio: data.bio ?? '', subject_focus: [] });
-        } else {
-          localStorage.removeItem('scholarly_user_id');
-        }
-      })
-      .catch(() => {
-        const name = localStorage.getItem('scholarly_name') ?? '';
-        const email = localStorage.getItem('scholarly_email') ?? '';
-        setUser({ id: userId, email, name, avatar: '🎓', bio: '', subject_focus: [] });
-      })
-      .finally(() => setIsLoading(false));
-  }, []);
+  })();
+}, []);
 
   const login = async (email: string, password: string): Promise<void> => {
     const fd = new FormData();
@@ -186,6 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = (): void => {
     clearSession();
     setUser(null);
+    window.location.href = '/login';
   };
 
   return (

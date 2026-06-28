@@ -377,19 +377,28 @@ export default function PlannerPanel({ userId, onClose, onXpUpdate }) {
   const addTask = async () => {
     if (!title.trim()) return;
     setLoading(true);
-    const fd = new FormData();
-    fd.append('title', title);
-    fd.append('subject', subject);
-    await apiFetch(`${API_URL}/planner/${userId}/add`, { method: 'POST', body: fd });
-    setTitle('');
-    setShowAdd(false);
-    load();
-    setLoading(false);
+    try {
+      const fd = new FormData();
+      fd.append('title', title);
+      fd.append('subject', subject);
+      await apiFetch(`${API_URL}/planner/${userId}/add`, { method: 'POST', body: fd });
+      setTitle('');
+      setShowAdd(false);
+      load();
+    } catch (e) {
+      console.error('Failed to add task:', e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const del = async (taskId) => {
-    await apiFetch(`${API_URL}/planner/${userId}/delete/${taskId}`, { method: 'POST' });
-    load();
+    try {
+      await apiFetch(`${API_URL}/planner/${userId}/delete/${taskId}`, { method: 'POST' });
+      load();
+    } catch (e) {
+      console.error('Failed to delete task:', e);
+    }
   };
 
   const generatePlan = async () => {
@@ -415,7 +424,9 @@ export default function PlannerPanel({ userId, onClose, onXpUpdate }) {
   };
 
   // Derived
-  const aiTasks     = tasks.filter(t => t.ai_generated);
+  const today       = new Date().toISOString().split('T')[0];
+  const aiTasks     = tasks.filter(t => t.ai_generated && t.plan_date === today);
+  const pastTasks   = tasks.filter(t => t.ai_generated && t.plan_date && t.plan_date < today);
   const manualTasks = tasks.filter(t => !t.ai_generated);
   const done        = tasks.filter(t => t.done).length;
   const total       = tasks.length;
@@ -423,7 +434,7 @@ export default function PlannerPanel({ userId, onClose, onXpUpdate }) {
   const allDone     = total > 0 && done === total;
   const estMins     = tasks.filter(t => !t.done && t.ai_generated).reduce((acc, t) => {
     const type = getType(t);
-    return acc + (type === 'study' ? 37 : type === 'quiz' ? 17 : 25);
+    return acc + (type === 'study' ? 37 : type === 'quiz' ? 17 : type === 'revision' ? 25 : 0);
   }, 0);
 
   return (

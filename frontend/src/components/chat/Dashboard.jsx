@@ -89,7 +89,7 @@ export default function Dashboard() {
   const [isQuestionAnswered, setIsQuestionAnswered] = useState(false);
   const [paperAnswers, setPaperAnswers]     = useState({});
   const [previousPapers, setPreviousPapers] = useState([]);
-  const [isLoadingAnswers, setIsLoadingAnswers] = useState(false);
+  const [isLoadingAnswers, setIsLoadingAnswers] = useState({});
   const [copiedId, setCopiedId] = useState(null);
 
   // ── NEW FEATURE STATE ──────────────────────
@@ -124,12 +124,9 @@ export default function Dashboard() {
   // ── Hydration ──────────────────────────────
   useEffect(() => {
     const uid   = localStorage.getItem("scholarly_user_id");
-    const token = null; // auth via httpOnly cookie
+    const token = localStorage.getItem("scholarly_token");
 
-    // If either credential is missing, redirect to login immediately.
-    // This is a defence-in-depth guard — page.js already checks, but
-    // direct /dashboard navigation or a cleared token should still redirect.
-    if (!uid) {
+    if (!uid || !token) {
       router.replace("/login");
       return;
     }
@@ -455,7 +452,7 @@ export default function Dashboard() {
       const fd = new FormData();
       fd.append('session_id', `${userId}_${currentSessionId}`);
       fd.append('paper_content', paperContent);
-      const res = await fetch(`${API_URL}/quiz/answers`, { method: 'POST', credentials: "include", body: fd });
+      const res = await apiFetch(`${API_URL}/quiz/answers`, { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`Answers error ${res.status}`);
       const data = await res.json();
       setPaperAnswers(prev => ({ ...prev, [msgId]: data.answers }));
@@ -581,20 +578,7 @@ export default function Dashboard() {
         formData.append("history",    JSON.stringify((sessions[currentId] || []).slice(-20)));
         files.forEach(file => formData.append("files", file));
 
-        const response = await apiFetch(`${API_URL}/chat`, {
-          method: "POST",
-          body: formData,
-          signal: controller.signal,
-        });
-
         clearTimeout(timeoutId);
-
-        // Guard: error responses have no stream body — .getReader() on null freezes UI
-        if (!response.ok || !response.body) {
-          const errText = await response.text().catch(() => response.statusText);
-          throw new Error(`Server error ${response.status}: ${errText}`);
-        }
-
         const decoder = new TextDecoder();
         let botResponse = "";
         let continueCount = 0;
@@ -944,7 +928,13 @@ export default function Dashboard() {
 
                     {/* Log out */}
                     <button
-                      onClick={() => { localStorage.removeItem('scholarly_user_id'); localStorage.removeItem('scholarly_email'); localStorage.removeItem('scholarly_name'); window.location.href = '/login'; }}
+                      onClick={() => {
+                        localStorage.removeItem('scholarly_token');
+                        localStorage.removeItem('scholarly_user_id');
+                        localStorage.removeItem('scholarly_email');
+                        localStorage.removeItem('scholarly_name');
+                        window.location.href = '/login';
+                      }}
                       className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-zinc-100 dark:hover:bg-white/5 transition-all"
                     >
                       <LogOut size={16} className="text-red-400 shrink-0" />
@@ -1690,7 +1680,13 @@ export default function Dashboard() {
                   <div className="py-4 border-b border-zinc-100 dark:border-white/6">
                     <p className="text-xs text-zinc-400 dark:text-zinc-600 uppercase tracking-widest font-bold mb-3">Danger Zone</p>
                     <button
-                      onClick={() => { localStorage.removeItem('scholarly_user_id'); localStorage.removeItem('scholarly_email'); localStorage.removeItem('scholarly_name'); window.location.href = '/login'; }}
+                      onClick={() => {
+                        localStorage.removeItem('scholarly_token');
+                        localStorage.removeItem('scholarly_user_id');
+                        localStorage.removeItem('scholarly_email');
+                        localStorage.removeItem('scholarly_name');
+                        window.location.href = '/login';
+                      }}
                       className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-red-400 hover:text-red-300 transition-all"
                       style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}
                     >
@@ -1766,7 +1762,7 @@ export default function Dashboard() {
           onComplete={(subjects, topic) => {
             setShowOnboarding(false);
             setProfileData(prev => ({ ...prev, subject_focus: subjects, onboarding_complete: true }));
-            if (topic) setInputValue(topic);
+            if (topic) setMessage(topic);
           }}
         />
       )}

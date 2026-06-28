@@ -1,9 +1,10 @@
 import asyncio
 import re
 
+from backend import db
+
 # Logs retry-weak calls per user so the verify endpoint can confirm
 # revision tasks were actually completed via the Weakness Tracker.
-_retry_log: dict = {}
 from datetime import datetime, timezone
 import json
 from typing import Optional
@@ -26,7 +27,7 @@ router = APIRouter()
 async def get_profile_endpoint(user_id: str, current_user: dict = Depends(get_current_user)):
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
-    return get_profile(user_id)
+    return await asyncio.to_thread(get_profile, user_id)
 
 
 import re as _re
@@ -68,41 +69,69 @@ async def update_profile_endpoint(
         if len(avatar) > 10:
             raise HTTPException(status_code=400, detail="Avatar must be a single emoji.")
 
-    profile = get_profile(user_id)
+    from backend.db import get_connection, release_connection
+
+    fields = []
+    values = []
+
     if name is not None:
-        profile["name"] = name
+        fields.append("name = %s")
+        values.append(name)
+
     if avatar is not None:
-        profile["avatar"] = avatar
+        fields.append("avatar = %s")
+        values.append(avatar)
+
     if bio is not None:
-        profile["bio"] = bio
+        fields.append("bio = %s")
+        values.append(bio)
+
     if subject_focus is not None:
         try:
             parsed = json.loads(subject_focus)
+
             if isinstance(parsed, list):
-                profile["subject_focus"] = [_sanitise_text(str(s), 50) for s in parsed[:20]]
+                fields.append("subject_focus = %s")
+                values.append(
+                    [
+                        _sanitise_text(str(s), 50)
+                        for s in parsed[:20]
+                    ]
+                )
         except Exception:
             pass
 
-    from backend.db import get_connection, release_connection
+    if not fields:
+        raise HTTPException(
+            status_code=400,
+            detail="No fields to update."
+        )
+
+    values.append(user_id)
+
     conn = get_connection()
+
     try:
         cursor = conn.cursor()
+
         cursor.execute(
-            """UPDATE users SET name = %s, avatar = %s, bio = %s, subject_focus = %s
-               WHERE id = %s""",
-            (
-                profile.get("name"),
-                profile.get("avatar"),
-                profile.get("bio"),
-                profile.get("subject_focus", []),
-                user_id,
-            )
+            f"""
+            UPDATE users
+            SET {', '.join(fields)}
+            WHERE id = %s
+            """,
+            values
         )
+
         conn.commit()
+
     finally:
         release_connection(conn)
 
-    return profile
+    return await asyncio.to_thread(
+        get_profile,
+        user_id
+    )
 
 
 # ── Weakness Tracking ─────────────────────────
@@ -110,13 +139,22 @@ async def update_profile_endpoint(
 async def get_weaknesses_endpoint(user_id: str, current_user: dict = Depends(get_current_user)):
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
-    return {"weaknesses": get_weaknesses(user_id)}
+    weaknesses = await asyncio.to_thread(
+        get_weaknesses,
+        user_id
+    )
+
+    return {"weaknesses": weaknesses}
 
 @router.post("/weaknesses/{user_id}/clear")
 async def clear_weakness_endpoint(user_id: str, topic: Optional[str] = Form(None), current_user: dict = Depends(get_current_user)):
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
-    clear_weakness(user_id, topic)
+    await asyncio.to_thread(
+        clear_weakness,
+        user_id,
+        topic
+    )
     return {"status": "cleared"}
 
 
@@ -125,10 +163,13 @@ async def clear_weakness_endpoint(user_id: str, topic: Optional[str] = Form(None
 async def get_streak_endpoint(user_id: str, current_user: dict = Depends(get_current_user)):
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
-    return get_streak(current_user["user_id"])
+    return await asyncio.to_thread(
+        get_streak,
+        current_user["user_id"]
+    )
 
 @router.post("/streak/{user_id}/touch")
-async def touch_streak(
+async def touch_streak_endpoint(
     user_id: str,
     action: str = Form(...),
     current_user: dict = Depends(get_current_user)
@@ -145,8 +186,7 @@ async def touch_streak(
     if action not in VALID_ACTIONS:
         raise HTTPException(status_code=400, detail=f"Invalid action. Must be one of: {VALID_ACTIONS}")
 
-    from backend.services.memory_service import touch_streak as _touch_streak
-    result = _touch_streak(user_id)
+    result = await asyncio.to_thread(touch_streak, user_id)
     return result
 
 
@@ -155,7 +195,10 @@ async def touch_streak(
 async def get_xp_endpoint(user_id: str, current_user: dict = Depends(get_current_user)):
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
-    return get_xp(current_user["user_id"])
+    return await asyncio.to_thread(
+        get_xp,
+        current_user["user_id"]
+    )
 
 LEVEL_REWARDS = {
     2:  "🦉 Night Owl avatar unlocked",
@@ -191,14 +234,30 @@ async def add_xp_endpoint(
     if amount is None:
         raise HTTPException(status_code=400, detail=f"Unknown action '{action}'. Valid: {list(XP_REWARDS)}")
     uid = current_user["user_id"]
-    prev_level = get_xp(uid).get("level", 1)
-    add_xp(uid, amount)
-    xp = get_xp(uid)
+    prev_level = (
+        await asyncio.to_thread(get_xp, uid)
+    ).get("level", 1)
+
+    await asyncio.to_thread(
+        add_xp,
+        uid,
+        amount
+    )
+
+    xp = await asyncio.to_thread(
+        get_xp,
+        uid
+    )
     new_level = xp.get("level", 1)
     if new_level > prev_level:
         reward = LEVEL_REWARDS.get(new_level)
         msg = f"🎉 Level {new_level} reached!" + (f" {reward}" if reward else "")
-        push_notification(uid, msg, "milestone")
+        await asyncio.to_thread(
+            push_notification,
+            uid,
+            msg,
+            "milestone"
+        )
         xp["level_up"] = True
         xp["reward"]   = reward
     else:
@@ -212,7 +271,12 @@ async def add_xp_endpoint(
 async def get_planner_endpoint(user_id: str, current_user: dict = Depends(get_current_user)):
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
-    return {"tasks": get_planner(user_id)}
+    tasks = await asyncio.to_thread(
+        get_planner,
+        user_id
+    )
+
+    return {"tasks": tasks}
 
 @router.post("/planner/{user_id}/add")
 async def add_task_endpoint(
@@ -232,26 +296,54 @@ async def add_task_endpoint(
         "done": False,
         "created": datetime.now(timezone.utc).isoformat(),
     }
-    add_task(user_id, task)
+    await asyncio.to_thread(
+        add_task,
+        user_id,
+        task
+    )
     return {"task": task}
 
 @router.post("/planner/{user_id}/toggle/{task_id}")
 async def toggle_task_endpoint(user_id: str, task_id: int, current_user: dict = Depends(get_current_user)):
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
-    task = toggle_task(user_id, task_id)
+    task = await asyncio.to_thread(
+        toggle_task,
+        user_id,
+        task_id
+    )
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     if task["done"]:
-        add_xp(user_id, 20)
-        push_notification(user_id, f"✅ Task '{task['title']}' completed! +20 XP", "success")
-    return {"task": task, "xp": get_xp(user_id)}
+        await asyncio.to_thread(
+            add_xp,
+            user_id,
+            20
+        )
+        await asyncio.to_thread(
+            push_notification,
+            user_id,
+            f"✅ Task '{task['title']}' completed! +20 XP",
+            "success"
+        )
+    xp = await asyncio.to_thread(
+        get_xp,
+        user_id
+    )
 
+    return {
+        "task": task,
+        "xp": xp
+    }
 @router.post("/planner/{user_id}/delete/{task_id}")
 async def delete_task_endpoint(user_id: str, task_id: int, current_user: dict = Depends(get_current_user)):
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
-    delete_task(user_id, task_id)
+    await asyncio.to_thread(
+        delete_task,
+        user_id,
+        task_id
+    )
     return {"status": "deleted"}
 
 
@@ -334,7 +426,10 @@ async def verify_task_endpoint(
         # ── QUIZ: notification log check ─────────────────────────────────────
         elif task_type == "quiz":
             from backend.services.memory_service import get_notifications
-            notifications = get_notifications(uid)
+            notifications = await asyncio.to_thread(
+                get_notifications,
+                uid
+            )
             subject_words = [w for w in task_title.replace("📖","").replace("🧠","").replace("🔁","").split() if len(w) > 3][:3]
 
             verified = False
@@ -393,30 +488,29 @@ async def verify_task_endpoint(
 
         # ── REVISION: retry_log check ─────────────────────────────────────────
         elif task_type == "revision":
-            entries = _retry_log.get(uid, [])
-            subject_words = [w for w in task_title.replace("🔁","").split() if len(w) > 3][:3]
+            from backend.db import get_connection, release_connection
+            conn = get_connection()
+            try:
+                cur = conn.cursor()
+                subject_words = [w for w in task_title.replace("🔁","").split() if len(w) > 3][:3]
+                like_clauses = " OR ".join([f"subject ILIKE %s" for _ in subject_words])
+                params = [f"%{w}%" for w in subject_words]
+                if task_created_dt:
+                    query = f"SELECT COUNT(*) FROM retry_log WHERE user_id = %s AND ({like_clauses}) AND created_at > %s"
+                    cur.execute(query, [uid] + params + [task_created_dt])
+                else:
+                    query = f"SELECT COUNT(*) FROM retry_log WHERE user_id = %s AND ({like_clauses})"
+                    cur.execute(query, [uid] + params)
+                count = cur.fetchone()[0]
+            finally:
+                release_connection(conn)
 
-            matching = [
-                e for e in entries
-                if any(w.lower() in e.get("subject", "").lower() for w in subject_words)
-                and (
-                    not task_created_dt
-                    or datetime.fromisoformat(e["timestamp"]) > task_created_dt
-                )
-            ]
-
-            if matching:
+            if count > 0:
                 verified = True
-                feedback = (
-                    "Verified! The bot logged your practice session from the Weakness Tracker. "
-                    "Targeting weak spots directly is the most effective revision strategy."
-                )
+                feedback = "Verified! The bot logged your practice session from the Weakness Tracker."
             else:
-                feedback = (
-                    "Not verified yet. The bot hasn't logged a practice session for this revision task. "
-                    "Open the Weakness Tracker, find a topic related to this subject, "
-                    "and click 'Practice This Topic'. The bot logs it automatically when you start."
-                )
+                feedback = "Not verified yet. Open the Weakness Tracker and click 'Practice This Topic'."
+
 
         # ── GENERAL: minimal AI check ─────────────────────────────────────────
         else:
@@ -451,11 +545,27 @@ async def verify_task_endpoint(
 
         # ── Award XP only on verified ─────────────────────────────────────────
         if verified:
-            task = toggle_task(uid, task_id)
+            task = await asyncio.to_thread(
+                toggle_task,
+                uid,
+                task_id
+            )
             if task and task.get("done"):
-                add_xp(uid, 20)
-                push_notification(uid, f"\u2705 '{task['title']}' verified & completed! +20 XP", "success")
-                xp_data = get_xp(uid)
+                await asyncio.to_thread(
+                    add_xp,
+                    uid,
+                    20
+                )
+                await asyncio.to_thread(
+                    push_notification,
+                    uid,
+                    f"\u2705 '{task['title']}' verified & completed! +20 XP",
+                    "success"
+                )
+                xp_data = await asyncio.to_thread(
+                    get_xp,
+                    uid
+                )
 
         return {"verified": verified, "feedback": feedback, "xp": xp_data}
 
@@ -480,16 +590,19 @@ async def generate_daily_plan_endpoint(
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
 
-    weaknesses = get_weaknesses(user_id)
+    weaknesses = await asyncio.to_thread(
+        get_weaknesses,
+        user_id
+    )
     weak_topics = list({w["topic"] for w in weaknesses[-5:]}) if weaknesses else []
 
     # Pull context from vector store if session provided
     context = ""
     if session_id:
         try:
-            db = get_vector_db(session_id)
+            db = get_vector_db(f"user_{user_id}")
             query = " ".join(weak_topics) if weak_topics else "study topics"
-            docs = db.similarity_search(query, k=3)
+            docs = await asyncio.to_thread(db.similarity_search, query, k=3)
             context = "\n".join([doc.page_content for doc in docs])
         except Exception:
             pass
@@ -557,12 +670,22 @@ async def generate_daily_plan_endpoint(
             "due_time": None,
             "done": False,
             "created": datetime.now(timezone.utc).isoformat(),
+            "plan_date": datetime.now(timezone.utc).date().isoformat(),   # ← Add this
             "ai_generated": True,
         }
-        add_task(user_id, task)
+        await asyncio.to_thread(
+            add_task,
+            user_id,
+            task
+        )
         created.append(task)
 
-    push_notification(user_id, "📅 Today's plan is ready! 3 tasks generated by AI.", "info")
+    await asyncio.to_thread(
+        push_notification,
+        user_id,
+        "📅 Today's plan is ready! 3 tasks generated by AI.",
+        "info"
+    )
     return {"tasks": created}
 
 
@@ -576,7 +699,10 @@ async def get_notifications_endpoint(
 ):
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
-    all_notifs = get_notifications(user_id)
+    all_notifs = await asyncio.to_thread(
+        get_notifications,
+        user_id
+    )
     # Newest first, paginated
     paginated  = list(reversed(all_notifs))[offset:offset + limit]
     return {
@@ -589,7 +715,10 @@ async def get_notifications_endpoint(
 
 @router.post("/notifications/{user_id}/read")
 async def mark_all_read_endpoint(user_id: str, current_user: dict = Depends(get_current_user)):
-    mark_notifications_read(user_id)
+    await asyncio.to_thread(
+        mark_notifications_read,
+        user_id
+    )
     return {"status": "all_read"}
 
 @router.post("/notifications/{user_id}/push")
@@ -601,7 +730,12 @@ async def push_notification_endpoint(
 ):
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
-    push_notification(user_id, message, notif_type)
+    await asyncio.to_thread(
+        push_notification,
+        user_id,
+        message,
+        notif_type
+    )
     return {"status": "pushed"}
 
 
@@ -612,7 +746,10 @@ async def get_revision_endpoint(user_id: str, session_id: Optional[str] = None, 
     Returns AI-generated revision suggestions based on the user's weak topics.
     If session_id is provided, also uses the vector store for context.
     """
-    weaknesses = get_weaknesses(user_id)
+    weaknesses = await asyncio.to_thread(
+        get_weaknesses,
+        user_id
+    )
     if not weaknesses:
         return {"revision": "No weaknesses tracked yet. Keep taking quizzes to build your revision plan! 📚"}
 
@@ -621,8 +758,8 @@ async def get_revision_endpoint(user_id: str, session_id: Optional[str] = None, 
     context = ""
     if session_id:
         try:
-            db = get_vector_db(session_id)
-            docs = db.similarity_search(" ".join(weak_topics), k=4)
+            db = get_vector_db(f"user_{user_id}")
+            docs = await asyncio.to_thread(db.similarity_search, " ".join(weak_topics), k=4)
             context = "\n".join([doc.page_content for doc in docs])
         except Exception:
             pass
@@ -728,7 +865,12 @@ async def get_progress(user_id: str, current_user: dict = Depends(get_current_us
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
     from backend.db import get_weekly_progress
-    return {"progress": get_weekly_progress(user_id)}
+    progress = await asyncio.to_thread(
+        get_weekly_progress,
+        user_id
+    )
+
+    return {"progress": progress}
 
 @router.post("/admin/notify/daily")
 async def trigger_daily_notifications(current_user: dict = Depends(get_current_user)):
@@ -743,7 +885,9 @@ async def trigger_daily_notifications(current_user: dict = Depends(get_current_u
     finally:
         release_connection(conn)
     from backend.services.notification_scheduler import schedule_daily_notifications
-    schedule_daily_notifications()
+    await asyncio.to_thread(
+        schedule_daily_notifications
+    )
     return {"status": "notifications sent"}
 
 @router.get("/admin/audit-log")
@@ -751,33 +895,72 @@ async def get_audit_log(
     limit: int = 100,
     current_user: dict = Depends(get_current_user)
 ):
+
     from backend.db import get_connection, release_connection
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT is_admin FROM users WHERE id = %s", (current_user["user_id"],))
-        row = cur.fetchone()
-        if not row or not row[0]:
-            raise HTTPException(status_code=403, detail="Admin only.")
-        cur.execute(
-            """SELECT user_id, action, detail, ip, created_at
-               FROM audit_log ORDER BY created_at DESC LIMIT %s""",
-            (limit,)
-        )
-        rows = cur.fetchall()
-        return {"logs": [
-            {"user_id": r[0], "action": r[1], "detail": r[2], "ip": r[3], "created_at": str(r[4])}
+
+    def _query():
+
+        conn = get_connection()
+
+        try:
+            cur = conn.cursor()
+
+            cur.execute(
+                "SELECT is_admin FROM users WHERE id = %s",
+                (current_user["user_id"],)
+            )
+
+            row = cur.fetchone()
+
+            if not row or not row[0]:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Admin only."
+                )
+
+            cur.execute(
+                """
+                SELECT user_id,
+                       action,
+                       detail,
+                       ip,
+                       created_at
+                FROM audit_log
+                ORDER BY created_at DESC
+                LIMIT %s
+                """,
+                (limit,)
+            )
+
+            return cur.fetchall()
+
+        finally:
+            release_connection(conn)
+
+    rows = await asyncio.to_thread(_query)
+
+    return {
+        "logs": [
+            {
+                "user_id": r[0],
+                "action": r[1],
+                "detail": r[2],
+                "ip": r[3],
+                "created_at": str(r[4]),
+            }
             for r in rows
-        ]}
-    finally:
-        release_connection(conn)
+        ]
+    }
 
 @router.get("/usage/{user_id}")
 async def get_usage_endpoint(user_id: str, current_user: dict = Depends(get_current_user)):
     if user_id != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access forbidden.")
     from backend.services.usage_service import get_usage, FREE_LIMITS
-    usage = get_usage(user_id)
+    usage = await asyncio.to_thread(
+        get_usage,
+        user_id
+    )
     return {
         "chat":  {"used": usage["chat"],  "limit": FREE_LIMITS["chat"]},
         "quiz":  {"used": usage["quiz"],  "limit": FREE_LIMITS["quiz"]},
@@ -786,92 +969,206 @@ async def get_usage_endpoint(user_id: str, current_user: dict = Depends(get_curr
 @router.get("/admin/users")
 async def admin_get_users(current_user: dict = Depends(get_current_user)):
     from backend.db import get_connection, release_connection
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT is_admin FROM users WHERE id = %s", (current_user["user_id"],))
-        if not (cur.fetchone() or [False])[0]:
-            raise HTTPException(status_code=403, detail="Admin only.")
-        cur.execute("""
-            SELECT u.id, u.name, u.email, u.is_admin, u.is_verified, u.created_at,
-                   COALESCE(x.total, 0) as xp, COALESCE(x.level, 1) as level
-            FROM users u
-            LEFT JOIN user_xp x ON x.user_id = u.id
-            ORDER BY u.created_at DESC
-        """)
-        rows = cur.fetchall()
-        return {"users": [
-            {"id": r[0], "name": r[1], "email": r[2], "is_admin": r[3],
-             "is_verified": r[4], "created_at": str(r[5]), "xp": r[6], "level": r[7]}
+
+    def _query():
+
+        conn = get_connection()
+
+        try:
+            cur = conn.cursor()
+
+            cur.execute(
+                "SELECT is_admin FROM users WHERE id = %s",
+                (current_user["user_id"],)
+            )
+
+            if not (cur.fetchone() or [False])[0]:
+                raise HTTPException(status_code=403, detail="Admin only.")
+
+            cur.execute("""
+                SELECT u.id,
+                       u.name,
+                       u.email,
+                       u.is_admin,
+                       u.is_verified,
+                       u.created_at,
+                       COALESCE(x.total,0),
+                       COALESCE(x.level,1)
+                FROM users u
+                LEFT JOIN user_xp x
+                ON x.user_id = u.id
+                ORDER BY u.created_at DESC
+            """)
+
+            return cur.fetchall()
+
+        finally:
+            release_connection(conn)
+
+    rows = await asyncio.to_thread(_query)
+
+    return {
+        "users": [
+            {
+                "id": r[0],
+                "name": r[1],
+                "email": r[2],
+                "is_admin": r[3],
+                "is_verified": r[4],
+                "created_at": str(r[5]),
+                "xp": r[6],
+                "level": r[7],
+            }
             for r in rows
-        ]}
-    finally:
-        release_connection(conn)
+        ]
+    }
 
 
 @router.delete("/admin/users/{target_id}")
-async def admin_delete_user(target_id: str, current_user: dict = Depends(get_current_user)):
+async def admin_delete_user(
+    target_id: str,
+    current_user: dict = Depends(get_current_user)
+):
     from backend.db import get_connection, release_connection
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT is_admin FROM users WHERE id = %s", (current_user["user_id"],))
-        if not (cur.fetchone() or [False])[0]:
-            raise HTTPException(status_code=403, detail="Admin only.")
-        if target_id == current_user["user_id"]:
-            raise HTTPException(status_code=400, detail="Cannot delete your own account.")
-        cur.execute("DELETE FROM users WHERE id = %s", (target_id,))
-        conn.commit()
-        from backend.services.audit_service import audit
-        audit(current_user["user_id"], "admin_delete_user", f"deleted={target_id}")
-        return {"status": "deleted"}
-    finally:
-        release_connection(conn)
+    def _delete_user():
+        conn = get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT is_admin FROM users WHERE id = %s",
+                (current_user["user_id"],)
+            )
+            if not (cur.fetchone() or [False])[0]:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Admin only."
+                )
+            if target_id == current_user["user_id"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot delete your own account."
+                )
+            cur.execute(
+                "DELETE FROM users WHERE id = %s",
+                (target_id,)
+            )
+            conn.commit()
+        finally:
+            release_connection(conn)
+    await asyncio.to_thread(_delete_user)
+    from backend.services.audit_service import audit
+    audit(
+        current_user["user_id"],
+        "admin_delete_user",
+        f"deleted={target_id}"
+    )
+    return {"status": "deleted"}
 
 
 @router.post("/admin/users/{target_id}/toggle-admin")
 async def admin_toggle_admin(target_id: str, current_user: dict = Depends(get_current_user)):
     from backend.db import get_connection, release_connection
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT is_admin FROM users WHERE id = %s", (current_user["user_id"],))
-        if not (cur.fetchone() or [False])[0]:
-            raise HTTPException(status_code=403, detail="Admin only.")
-        cur.execute("UPDATE users SET is_admin = NOT is_admin WHERE id = %s RETURNING is_admin", (target_id,))
-        row = cur.fetchone()
-        conn.commit()
-        return {"is_admin": row[0]}
-    finally:
-        release_connection(conn)
+    def _toggle():
+        conn = get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT is_admin FROM users WHERE id = %s",
+                (current_user["user_id"],)
+            )
+            if not (cur.fetchone() or [False])[0]:
+                raise HTTPException(status_code=403, detail="Admin only.")
+            cur.execute(
+                """
+                UPDATE users
+                SET is_admin = NOT is_admin
+                WHERE id = %s
+                RETURNING is_admin
+                """,
+                (target_id,)
+            )
+            row = cur.fetchone()
+            conn.commit()
+            return row[0]
+        finally:
+            release_connection(conn)
+    is_admin = await asyncio.to_thread(_toggle)
+    return {"is_admin": is_admin}
 
 
 @router.get("/admin/stats")
 async def admin_get_stats(current_user: dict = Depends(get_current_user)):
+
     from backend.db import get_connection, release_connection
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT is_admin FROM users WHERE id = %s", (current_user["user_id"],))
-        if not (cur.fetchone() or [False])[0]:
-            raise HTTPException(status_code=403, detail="Admin only.")
-        cur.execute("SELECT COUNT(*) FROM users")
-        total_users = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '24 hours'")
-        new_today = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(DISTINCT user_id) FROM chat_sessions WHERE created_at > NOW() - INTERVAL '24 hours'")
-        dau = cur.fetchone()[0]
-        cur.execute("SELECT u.name, x.total FROM user_xp x JOIN users u ON u.id = x.user_id ORDER BY x.total DESC LIMIT 10")
-        leaderboard = [{"name": r[0], "xp": r[1]} for r in cur.fetchall()]
-        cur.execute("SELECT SUM(chat_count), SUM(quiz_count) FROM usage_limits WHERE date = CURRENT_DATE")
-        usage = cur.fetchone()
-        return {
-            "total_users":   total_users,
-            "new_today":     new_today,
-            "dau":           dau,
-            "leaderboard":   leaderboard,
-            "chats_today":   usage[0] or 0,
-            "quizzes_today": usage[1] or 0,
-        }
-    finally:
-        release_connection(conn)
+
+    def _query():
+
+        conn = get_connection()
+
+        try:
+            cur = conn.cursor()
+
+            cur.execute(
+                "SELECT is_admin FROM users WHERE id = %s",
+                (current_user["user_id"],)
+            )
+
+            if not (cur.fetchone() or [False])[0]:
+                raise HTTPException(status_code=403, detail="Admin only.")
+
+            cur.execute("SELECT COUNT(*) FROM users")
+            total_users = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                SELECT COUNT(*)
+                FROM users
+                WHERE created_at > NOW() - INTERVAL '24 hours'
+                """
+            )
+            new_today = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                SELECT COUNT(DISTINCT user_id)
+                FROM chat_sessions
+                WHERE created_at > NOW() - INTERVAL '24 hours'
+                """
+            )
+            dau = cur.fetchone()[0]
+
+            cur.execute("""
+                SELECT u.name, x.total
+                FROM user_xp x
+                JOIN users u ON u.id = x.user_id
+                ORDER BY x.total DESC
+                LIMIT 10
+            """)
+
+            leaderboard = [
+                {"name": r[0], "xp": r[1]}
+                for r in cur.fetchall()
+            ]
+
+            cur.execute("""
+                SELECT SUM(chat_count),
+                       SUM(quiz_count)
+                FROM usage_limits
+                WHERE date = CURRENT_DATE
+            """)
+
+            usage = cur.fetchone()
+
+            return {
+                "total_users": total_users,
+                "new_today": new_today,
+                "dau": dau,
+                "leaderboard": leaderboard,
+                "chats_today": usage[0] or 0,
+                "quizzes_today": usage[1] or 0,
+            }
+
+        finally:
+            release_connection(conn)
+
+    return await asyncio.to_thread(_query)

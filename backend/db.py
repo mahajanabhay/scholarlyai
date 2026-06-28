@@ -289,6 +289,21 @@ def init_db():
         )
         """)
 
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS retry_log (
+            id         SERIAL PRIMARY KEY,
+            user_id    TEXT NOT NULL,
+            subject    TEXT NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """)
+
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_retry_log_user_created
+            ON retry_log (user_id, created_at DESC)
+        """)
+
         conn.commit()
         print("✅ Database tables and indexes initialized successfully")
     except Exception as e:

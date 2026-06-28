@@ -2,14 +2,16 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def client():
     with patch("backend.core.config.GROQ_API_KEY", "test_key"), \
          patch("backend.db._init_pool"), \
-         patch("backend.db.connection_pool", MagicMock()):
+         patch("backend.db.connection_pool", MagicMock()), \
+         patch("backend.db.init_db"):
         from backend.app import app
         from fastapi.testclient import TestClient
-        return TestClient(app)
+        with TestClient(app) as c:
+            yield c
 
 
 def test_chat_requires_auth(client):

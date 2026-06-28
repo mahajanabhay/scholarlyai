@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Dashboard from "../components/chat/Dashboard.jsx";
 import ErrorBoundary from "../components/common/ErrorBoundary";
+import { getAuthHeaders } from "../context/AuthContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -20,9 +21,13 @@ export default function HomePage() {
       return;
     }
 
-    fetch(`${API_URL}/auth/check/${uid}`, {
-      credentials: "include",
-    })
+    fetch(
+      `${API_URL}/auth/check/${uid}`,
+      {
+        headers: getAuthHeaders(),
+        credentials: "include",
+      }
+    )
       .then((res) => {
         if (res.ok) {
           setIsAuthenticated(true);

@@ -289,7 +289,8 @@ async def quiz_endpoint(
     """
     try:
         session_id = session_id.replace("/", "_").replace("\\", "_").replace("..", "_")
-        quiz_mem = get_quiz_memory(session_id)
+        scoped_session_id = f"{current_user['user_id']}_{session_id}"
+        quiz_mem = get_quiz_memory(scoped_session_id)
         is_quiz_start = is_starting.lower() == "true"
         # Enforce daily quiz limit on new quiz starts only
         if is_quiz_start:
@@ -300,7 +301,7 @@ async def quiz_endpoint(
                     detail=f"Daily quiz limit of {FREE_LIMITS['quiz']} reached. Resets at midnight."
                 )
         # ── Strict academic gate (only check when starting a new quiz topic) ──
-        if is_quiz_start and not is_academic_query(message):
+        if is_quiz_start and not await asyncio.to_thread(is_academic_query, message):
             raise HTTPException(
                 status_code=400,
                 detail=NON_ACADEMIC_REPLY,
@@ -314,14 +315,6 @@ async def quiz_endpoint(
             quiz_mem["asked_topics"] = []
             print(f"✅ Quiz started on topic: '{message}' → Expanded: '{expanded_topic}'")
 
-        # ── Record weakness if the previous answer was wrong ──
-        if last_was_wrong.lower() == "true" and last_question and quiz_mem.get("quiz_topic"):
-            record_weakness(current_user["user_id"], quiz_mem["quiz_topic"], last_question)
-            push_notification(
-                current_user["user_id"],
-                f"🎯 Weakness recorded in '{quiz_mem['quiz_topic']}' — auto-revision scheduled.",
-                "warning",
-            )
             print(f"📊 Weakness tracked for user '{current_user['user_id']}' in '{quiz_mem['quiz_topic']}'")
 
         feedback = ""
@@ -329,30 +322,28 @@ async def quiz_endpoint(
             grading_prompt = (
                 f"Question: {last_question}\n"
                 f"Student's answer: {message}\n\n"
-                "Grade this answer with EXACT, CLEAN, DETAILED explanation:\n"
-                "1. State if the answer is CORRECT or INCORRECT (be precise)\n"
-                "2. Provide 2-3 sentences explaining why\n"
-                "3. Give a specific study tip or concept to review if wrong\n"
-                "4. If correct, explain the key concept being tested\n"
-                "Keep it concise, factual, and academically rigorous."
+                "Grade this answer:\n"
+                "1. Provide 2-3 sentences explaining why the answer is right or wrong.\n"
+                "2. Give a specific study tip if wrong, or explain the key concept if correct.\n"
+                "3. End your response with EXACTLY one of these two lines:\n"
+                "VERDICT: CORRECT\n"
+                "VERDICT: INCORRECT\n"
+                "Do not add anything after the VERDICT line."
             )
             eval_resp = await asyncio.to_thread(
                 client.chat.completions.create,
                 model=LLM_MODEL,
                 messages=[
                     {
-                "role": "system",
-                "content": (
-                    "You are an expert educator providing model answers to exam questions.\n"
-                    "Format your response in clean markdown:\n"
-                    "- Use '## Q1)', '## Q2)' etc. as headers for each answer\n"
-                    "- Use bullet points or numbered lists where appropriate\n"
-                    "- Bold key terms using **term**\n"
-                    "- Keep each answer concise and well-structured\n"
-                    "- Add a blank line between each answer section\n"
-                    "NEVER write answers as a continuous wall of text."
-                )
-            },
+                        "role": "system",
+                        "content": (
+                            "You are a strict academic quiz grader. "
+                            "Grade the student's answer and end your response with exactly one of:\n"
+                            "VERDICT: CORRECT\n"
+                            "VERDICT: INCORRECT\n"
+                            "Never omit the VERDICT line. Never add text after it."
+                        )
+                    },
                     {"role": "user", "content": grading_prompt},
                 ],
                 max_tokens=MAX_TOKENS,
@@ -360,9 +351,9 @@ async def quiz_endpoint(
             )
             feedback = eval_resp.choices[0].message.content
 
-        db = get_vector_db(session_id)
+        db = get_vector_db(f"user_{current_user['user_id']}")
         search_query = quiz_mem["quiz_topic"] if quiz_mem["quiz_topic"] else message
-        docs = db.similarity_search(search_query, k=4)
+        docs = await asyncio.to_thread(db.similarity_search, search_query, k=4)
         context = "\n".join([doc.page_content for doc in docs])
 
         # ✅ QUESTION PAPER MODE
@@ -370,7 +361,6 @@ async def quiz_endpoint(
             match = re.search(r'(\d+)', message)
             num_questions = int(match.group(1)) if match else 10
 
-            total_marks = num_questions * 4
             total_marks = num_questions * 4
             previously_used = (
                 f"\n\nPREVIOUSLY GENERATED PAPERS (DO NOT REPEAT THESE QUESTIONS OR TOPICS):\n{previous_papers}\n\n"
@@ -511,19 +501,32 @@ async def quiz_endpoint(
         # Award streak for verified quiz activity
         try:
             from backend.services.memory_service import touch_streak
-            touch_streak(current_user["user_id"])
+            await asyncio.to_thread(touch_streak, current_user["user_id"])
         except Exception:
             pass
 
-
-        # Record quiz progress
         try:
             from backend.db import record_progress
-            record_progress(current_user["user_id"], quizzes_passed=1)
+            await asyncio.to_thread(record_progress, current_user["user_id"], 1)
         except Exception:
             pass
 
-        is_correct = not any(w in feedback.lower() for w in ["incorrect", "wrong", "not correct"]) if feedback else None
+        is_correct = ("verdict: correct" in feedback.lower()) if feedback else None
+
+        # Record weakness immediately using THIS request's grading result
+        if is_correct is False and last_question and quiz_mem.get("quiz_topic"):
+            await asyncio.to_thread(
+                record_weakness,
+                current_user["user_id"],
+                quiz_mem["quiz_topic"],
+                last_question,
+            )
+            await asyncio.to_thread(
+                push_notification,
+                current_user["user_id"],
+                f"🎯 Weakness recorded in '{quiz_mem['quiz_topic']}' — auto-revision scheduled.",
+                "warning",
+            )
 
         return {
             "feedback":        feedback,
@@ -564,14 +567,15 @@ async def get_answers_endpoint(
     """
     try:
         session_id = session_id.replace("/", "_").replace("\\", "_").replace("..", "_")
-        quiz_mem = get_quiz_memory(session_id)
+        scoped_session_id = f"{current_user['user_id']}_{session_id}"
+        quiz_mem = get_quiz_memory(scoped_session_id)
         
         if not quiz_mem["quiz_topic"]:
             raise HTTPException(status_code=400, detail="No active quiz session")
 
-        db = get_vector_db(session_id)
+        db = get_vector_db(f"user_{current_user['user_id']}")
         search_query = quiz_mem["quiz_topic"]
-        docs = db.similarity_search(search_query, k=5)
+        docs = await asyncio.to_thread(db.similarity_search, search_query, k=5)
         context = "\n".join([doc.page_content for doc in docs])
 
         question_paper = paper_content or quiz_mem.get("question_paper", "")

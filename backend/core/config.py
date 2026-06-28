@@ -1,6 +1,10 @@
 # NEW
 import os
 from dotenv import load_dotenv
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 load_dotenv()  # single load point for the entire app
 
@@ -32,11 +36,12 @@ DB_HOST              = os.getenv("DB_HOST", "localhost")
 DB_PORT              = os.getenv("DB_PORT", "5432")
 DB_NAME              = os.getenv("DB_NAME", "scholarly_ai")
 DB_USER              = os.getenv("DB_USER", "postgres")
-SMTP_HOST            = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_HOST            = os.getenv("SMTP_HOST")
 SMTP_PORT            = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER            = os.getenv("SMTP_USER", "")
-SMTP_PASSWORD        = os.getenv("SMTP_PASSWORD", "")
-APP_URL              = os.getenv("APP_URL", "http://localhost:3000")
+SMTP_USER            = os.getenv("SMTP_USER", "").strip()
+SMTP_PASSWORD        = os.getenv("SMTP_PASSWORD", "").strip()
+EMAIL_ENABLED        = os.getenv("EMAIL_ENABLED", "false").lower() == "true"
+APP_URL              = os.getenv("APP_URL")
 SENTRY_DSN           = os.getenv("SENTRY_DSN", "")
 ENVIRONMENT          = os.getenv("ENVIRONMENT", "development")
 KNOWLEDGE_UPLOAD_DIR = os.getenv("KNOWLEDGE_UPLOAD_DIR", "./knowledge_uploads")

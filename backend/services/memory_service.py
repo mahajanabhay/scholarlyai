@@ -1,6 +1,5 @@
 import json
 from datetime import date, datetime, timezone
-from collections import OrderedDict
 from backend.core.cache import get as cache_get, set as cache_set, delete as cache_delete
 
 from backend.db import (
@@ -17,6 +16,7 @@ from backend.db import (
 # On startup, data is loaded from DB on first access (lazy), not bulk-restored
 # from JSON. The backup_service JSON is now a last-resort fallback only.
 
+import threading
 _profiles:      dict[str, dict] = {}
 _streaks:       dict[str, dict] = {}
 _xp:            dict[str, dict] = {}
@@ -24,9 +24,12 @@ _weaknesses:    dict[str, list] = {}
 _planners:      dict[str, list] = {}
 _notifications: dict[str, list] = {}
 
-# LRU cap for quiz memory (no DB — ephemeral per session, resets on restart is acceptable)
-_QUIZ_MEMORY_MAX = 100
-_quiz_memory: OrderedDict = OrderedDict()
+_profiles_lock      = threading.Lock()
+_streaks_lock       = threading.Lock()
+_xp_lock            = threading.Lock()
+_weaknesses_lock    = threading.Lock()
+_planners_lock      = threading.Lock()
+_notifications_lock = threading.Lock()
 
 
 # ── Profiles ──────────────────────────────────────────────────────────────────
@@ -108,41 +111,38 @@ def _current_iso_week(date_str: str) -> str:
 
 
 def touch_streak(user_id: str, client_date: str | None = None):
-    from datetime import date as dt, timedelta, timezone
-    import datetime as _dt
+    from datetime import date as dt, timedelta
+    today = datetime.now(timezone.utc).date().isoformat()
 
-    # Always use server UTC date — never trust client_date for streak logic.
-    # client_date is accepted only to detect same-day duplicates on the
-    # frontend, but the authoritative date is always server-side.
-    today = dt.today().isoformat()
+    with _streaks_lock:
+        streak = get_streak(user_id)
+        last   = streak["last_active"]
 
-    streak = get_streak(user_id)
-    last   = streak["last_active"]
+        if last == today:
+            streak["recovered_today"] = False
+            return
 
-    if last == today:
         streak["recovered_today"] = False
-        return
+        yesterday    = (dt.fromisoformat(today) - timedelta(days=1)).isoformat()
+        two_days_ago = (dt.fromisoformat(today) - timedelta(days=2)).isoformat()
+        this_week    = _current_iso_week(today)
 
-    streak["recovered_today"] = False
-    yesterday    = (dt.fromisoformat(today) - timedelta(days=1)).isoformat()
-    two_days_ago = (dt.fromisoformat(today) - timedelta(days=2)).isoformat()
-    this_week    = _current_iso_week(today)
+        if streak["freeze_week"] != this_week:
+            streak["freeze_used"] = False
 
-    if streak["freeze_week"] != this_week:
-        streak["freeze_used"] = False
+        if last == yesterday:
+            streak["current"] += 1
+        elif last == two_days_ago and not streak["freeze_used"]:
+            streak["current"]        += 1
+            streak["freeze_used"]     = True
+            streak["freeze_week"]     = this_week
+            streak["recovered_today"] = True
+        else:
+            streak["current"] = 1
 
-    if last == yesterday:
-        streak["current"] += 1
-    elif last == two_days_ago and not streak["freeze_used"]:
-        streak["current"]        += 1
-        streak["freeze_used"]     = True
-        streak["freeze_week"]     = this_week
-        streak["recovered_today"] = True
-    else:
-        streak["current"] = 1
-
-    streak["longest"]     = max(streak["longest"], streak["current"])
-    streak["last_active"] = today
+        streak["longest"]     = max(streak["longest"], streak["current"])
+        streak["last_active"] = today
+        current = streak["current"]
 
     try:
         upsert_streak(user_id, streak)
@@ -159,7 +159,6 @@ def touch_streak(user_id: str, client_date: str | None = None):
         100: ("👑 100-Day Streak!", "100 days! You've achieved something remarkable.", 500),
         365: ("🎓 365-Day Streak!", "A full year of learning. Legendary status.",    1000),
     }
-    current = streak["current"]
     if current in MILESTONES:
         title, message, bonus_xp = MILESTONES[current]
         push_notification(user_id, f"{title} {message} +{bonus_xp} bonus XP 🎁", "milestone")
@@ -185,9 +184,10 @@ def get_xp(user_id: str) -> dict:
 
 
 def add_xp(user_id: str, amount: int):
-    xp = get_xp(user_id)
-    xp["total"] += amount
-    xp["level"]  = 1 + xp["total"] // 500
+    with _xp_lock:
+        xp = get_xp(user_id)
+        xp["total"] += amount
+        xp["level"]  = 1 + xp["total"] // 500
     try:
         upsert_xp(user_id, xp)
         cache_set(f"xp:{user_id}", xp)
@@ -196,7 +196,6 @@ def add_xp(user_id: str, amount: int):
 
 
 # ── Weaknesses ────────────────────────────────────────────────────────────────
-
 def get_weaknesses(user_id: str) -> list:
     cached = cache_get(f"weaknesses:{user_id}")
     if cached:
@@ -214,25 +213,30 @@ def get_weaknesses(user_id: str) -> list:
 
 
 def record_weakness(user_id: str, topic: str, question: str):
-    ws = get_weaknesses(user_id)
-    ws.append({
-        "topic":       topic,
-        "question":    question[:200],
-        "timestamp":   datetime.now(timezone.utc).isoformat(),
-        "retry_count": 0,
-    })
-    _weaknesses[user_id] = ws[-50:]
+    with _weaknesses_lock:
+        ws = get_weaknesses(user_id)
+        ws.append({
+            "topic":       topic,
+            "question":    question[:200],
+            "timestamp":   datetime.now(timezone.utc).isoformat(),
+            "retry_count": 0,
+        })
+        _weaknesses[user_id] = ws[-50:]
     try:
         upsert_weaknesses(user_id, _weaknesses[user_id])
+        cache_delete(f"weaknesses:{user_id}")  # invalidate Redis cache
     except Exception as e:
         print(f"⚠️ [weaknesses] DB upsert failed for {user_id}: {e}")
 
 
 def clear_weakness(user_id: str, topic: str | None = None):
-    ws = get_weaknesses(user_id)
-    _weaknesses[user_id] = [w for w in ws if w["topic"] != topic] if topic else []
+    with _weaknesses_lock:
+        # Always reload from DB — never trust stale cache for destructive ops
+        db_ws = load_weaknesses_from_db(user_id) or []
+        _weaknesses[user_id] = [w for w in db_ws if w["topic"] != topic] if topic else []
     try:
         upsert_weaknesses(user_id, _weaknesses[user_id])
+        cache_delete(f"weaknesses:{user_id}")  # invalidate Redis cache
     except Exception as e:
         print(f"⚠️ [weaknesses] DB upsert failed for {user_id}: {e}")
 
@@ -251,35 +255,41 @@ def get_planner(user_id: str) -> list:
 
 
 def add_task(user_id: str, task: dict):
-    tasks = get_planner(user_id)
-    tasks.append(task)
-    _planners[user_id] = tasks
+    with _planners_lock:
+        # Always reload from DB to get authoritative list
+        from backend.db import load_planner_from_db
+        db_tasks = load_planner_from_db(user_id) or []
+        db_tasks.append(task)
+        _planners[user_id] = db_tasks
     try:
-        upsert_planner(user_id, tasks)
+        upsert_planner(user_id, db_tasks)
     except Exception as e:
         print(f"⚠️ [planner] DB upsert failed for {user_id}: {e}")
 
 
 def toggle_task(user_id: str, task_id: int) -> dict | None:
-    for task in get_planner(user_id):
-        if task["id"] == task_id:
-            task["done"] = not task["done"]
-            try:
-                upsert_planner(user_id, _planners[user_id])
-            except Exception as e:
-                print(f"⚠️ [planner] DB upsert failed for {user_id}: {e}")
-            return task
+    with _planners_lock:
+        db_tasks = load_planner_from_db(user_id) or []
+        _planners[user_id] = db_tasks
+        for task in _planners[user_id]:
+            if task["id"] == task_id:
+                task["done"] = not task["done"]
+                try:
+                    upsert_planner(user_id, _planners[user_id])
+                except Exception as e:
+                    print(f"⚠️ [planner] DB upsert failed for {user_id}: {e}")
+                return task
     return None
 
-
 def delete_task(user_id: str, task_id: int):
-    tasks = [t for t in get_planner(user_id) if t["id"] != task_id]
-    _planners[user_id] = tasks
+    with _planners_lock:
+        db_tasks = load_planner_from_db(user_id) or []
+        tasks = [t for t in db_tasks if t["id"] != task_id]
+        _planners[user_id] = tasks
     try:
         upsert_planner(user_id, tasks)
     except Exception as e:
         print(f"⚠️ [planner] DB upsert failed for {user_id}: {e}")
-
 
 # ── Notifications ─────────────────────────────────────────────────────────────
 
@@ -297,15 +307,15 @@ def get_notifications(user_id: str) -> list:
 MAX_NOTIFICATIONS = 50
 
 def push_notification(user_id: str, message: str, notif_type: str = "info"):
-    ns = get_notifications(user_id)
-    ns.append({
-        "message":   message,
-        "type":      notif_type,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "read":      False,
-    })
-    # Archive old read notifications, keep last MAX_NOTIFICATIONS total
-    _notifications[user_id] = ns[-MAX_NOTIFICATIONS:]
+    with _notifications_lock:
+        ns = get_notifications(user_id)
+        ns.append({
+            "message":   message,
+            "type":      notif_type,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "read":      False,
+        })
+        _notifications[user_id] = ns[-MAX_NOTIFICATIONS:]
     try:
         upsert_notifications(user_id, _notifications[user_id])
     except Exception as e:
@@ -313,21 +323,11 @@ def push_notification(user_id: str, message: str, notif_type: str = "info"):
 
 
 def mark_notifications_read(user_id: str):
-    for n in get_notifications(user_id):
-        n["read"] = True
+    with _notifications_lock:
+        for n in get_notifications(user_id):
+            n["read"] = True
     try:
         upsert_notifications(user_id, _notifications[user_id])
     except Exception as e:
         print(f"⚠️ [notifications] DB upsert failed for {user_id}: {e}")
 
-
-# ── Quiz memory (LRU, ephemeral) ──────────────────────────────────────────────
-
-def get_quiz_memory(session_id: str) -> dict:
-    if session_id in _quiz_memory:
-        _quiz_memory.move_to_end(session_id)
-        return _quiz_memory[session_id]
-    if len(_quiz_memory) >= _QUIZ_MEMORY_MAX:
-        _quiz_memory.popitem(last=False)
-    _quiz_memory[session_id] = {"asked_questions": [], "question_count": 0}
-    return _quiz_memory[session_id]

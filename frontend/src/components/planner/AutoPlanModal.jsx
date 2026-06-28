@@ -62,16 +62,20 @@ export function AutoPlanModal({ userId, onClose, onXpUpdate }) {
       setChecked({});
       setStep('done');
     } catch {
-      // Fallback plan
       const fallback = [
         { id: Date.now(),     title: 'Study one chapter from your current subject', subject: weakTopics[0] || 'General', type: 'study' },
         { id: Date.now() + 1, title: `Take a 5-question quiz on ${weakTopics[0] || 'your subject'}`, subject: weakTopics[0] || 'General', type: 'quiz' },
         { id: Date.now() + 2, title: 'Review your notes and highlight key formulas', subject: 'General', type: 'revision' },
       ];
+      for (const task of fallback) {
+        const tfd = new FormData();
+        tfd.append('title',   task.title);
+        tfd.append('subject', task.subject);
+        await apiFetch(`${API_URL}/planner/${userId}/add`, { method: 'POST', body: tfd });
+      }
       setTasks(fallback);
       setStep('done');
     }
-  };
 
   const toggleCheck = async (task) => {
     const nowDone = !checked[task.id];
@@ -163,4 +167,4 @@ export function AutoPlanModal({ userId, onClose, onXpUpdate }) {
       </div>
     </div>
   );
-}
+}}

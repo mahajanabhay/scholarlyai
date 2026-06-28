@@ -4,13 +4,26 @@ Email Service — sends verification emails via SMTP
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from backend.core.config import SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, APP_URL
+from backend.core.config import (
+    SMTP_HOST,
+    SMTP_PORT,
+    SMTP_USER,
+    SMTP_PASSWORD,
+    APP_URL,
+    EMAIL_ENABLED,
+)
+
+def _email_disabled() -> bool:
+    if not EMAIL_ENABLED:
+        return True
+    if not SMTP_USER or not SMTP_PASSWORD:
+        return True
+    return False
 
 
 def send_verification_email(to_email: str, name: str, token: str) -> bool:
     """Send verification email. Returns True on success."""
-    if not SMTP_USER or not SMTP_PASSWORD:
-        print(f"⚠️  Email not configured — skipping verification email for {to_email}")
+    if _email_disabled():
         return False
 
     verify_url = f"{APP_URL}/verify-email?token={token}"
@@ -50,8 +63,7 @@ def send_verification_email(to_email: str, name: str, token: str) -> bool:
         return False
     
 def send_password_reset_email(to_email: str, name: str, token: str) -> bool:
-    if not SMTP_USER or not SMTP_PASSWORD:
-        print(f"⚠️  Email not configured — skipping password reset email for {to_email}")
+    if _email_disabled():
         return False
 
     reset_url = f"{APP_URL}/reset-password?token={token}"
@@ -91,8 +103,7 @@ def send_password_reset_email(to_email: str, name: str, token: str) -> bool:
         return False
     
 def _send_raw_email(to_email: str, name: str, subject: str, html_body: str) -> bool:
-    if not SMTP_USER or not SMTP_PASSWORD:
-        print(f"⚠️  Email not configured — skipping: {to_email}")
+    if _email_disabled():
         return False
     from backend.core.config import APP_URL
     html_body = html_body.replace("$APP_URL", APP_URL)

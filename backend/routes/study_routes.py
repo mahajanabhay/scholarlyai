@@ -6,7 +6,6 @@ import asyncio
 from fastapi import APIRouter, Form, Depends, HTTPException, Request
 from backend.core.limiter import limiter
 from backend.core.jwt_auth import get_current_user
-from backend.routes.profile_routes import _retry_log  # for retry verification logging
 
 from backend.routes.chat_routes import NON_ACADEMIC_REPLY, is_academic_query
 from backend.core.llm import client, LLM_MODEL
@@ -70,7 +69,7 @@ async def start_study_session(
     request: Request,
     subject:  str           = Form(...),
     user_id:  Optional[str] = Form(None),
-    num_questions: int      = Form(4),
+    num_questions: int = Form(4),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -78,6 +77,7 @@ async def start_study_session(
     returns them all at once so the frontend can run a guided quiz flow.
     """
     try:
+        num_questions = min(max(num_questions, 1), 10)
         if not await asyncio.to_thread(is_academic_query, subject):
             raise HTTPException(status_code=400, detail=NON_ACADEMIC_REPLY)
 
@@ -150,10 +150,11 @@ async def study_session_results(
 
         uid = current_user["user_id"]
         for q_text in wrong_list:
-            record_weakness(uid, subject, q_text)
+            await asyncio.to_thread(record_weakness, uid, subject, q_text)
         xp_earned = max(5, (score / max(total, 1)) * 50)
-        add_xp(uid, int(xp_earned))
-        push_notification(
+        await asyncio.to_thread(add_xp, uid, int(xp_earned))
+        await asyncio.to_thread(
+            push_notification,
             uid,
             f"📖 Study session on '{subject}' complete! Score: {score}/{total}. +{int(xp_earned)} XP",
             "success" if score >= total // 2 else "warning",
@@ -208,14 +209,24 @@ async def study_session_retry_weak(
     # revision tasks were actually done (not just opened and closed).
     effective_uid = current_user["user_id"]
     if effective_uid:
-        if effective_uid not in _retry_log:
-            _retry_log[effective_uid] = []
-        _retry_log[effective_uid].append({
-            "subject":   subject,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
-        # Keep only last 50 entries per user
-        _retry_log[effective_uid] = _retry_log[effective_uid][-50:]
+        def _log_retry(uid: str, subject: str):
+            from backend.db import get_connection, release_connection
+            conn = get_connection()
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    """INSERT INTO retry_log (user_id, subject, created_at)
+                    VALUES (%s, %s, %s)""",
+                    (uid, subject, datetime.now(timezone.utc))
+                )
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                print(f"⚠️ Failed to log retry: {e}")
+            finally:
+                release_connection(conn)
+
+        await asyncio.to_thread(_log_retry, effective_uid, subject)
 
     try:
         weak_questions = json.loads(weak_topic_questions)
@@ -227,8 +238,10 @@ async def study_session_retry_weak(
         raise HTTPException(status_code=400, detail=f"Invalid weak_topic_questions JSON: {e}")
 
     try:
+        num_questions = min(max(num_questions, 1), 10)
         # Extract key topics from weak questions
-        topics_to_focus = ", ".join(weak_questions[:3]) if weak_questions else subject
+        sanitised = [str(q)[:200].replace("\n", " ") for q in weak_questions[:3]]
+        topics_to_focus = ", ".join(sanitised) if sanitised else subject
         
         prompt = f"""Generate exactly {num_questions} multiple-choice quiz questions on these specific weak areas in '{subject}':
 {topics_to_focus}

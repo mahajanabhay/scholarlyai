@@ -1,24 +1,24 @@
-from locust import HttpUser, task, between
+from locust import HttpUser, task, between, StopUser
 import random
 import json
 
 import os
-TEST_EMAIL    = os.getenv("LOCUST_TEST_EMAIL", "test@example.com")
-TEST_PASSWORD = os.getenv("LOCUST_TEST_PASSWORD", "changeme")
+TEST_EMAIL_TEMPLATE = os.getenv("LOCUST_TEST_EMAIL_TEMPLATE", "loadtest+{}@example.com")
+TEST_PASSWORD       = os.getenv("LOCUST_TEST_PASSWORD", "changeme")
 TEST_TOKEN    = ""  # filled after login
 
+import itertools
+_user_counter = itertools.count(1)
 
 class ClarixUser(HttpUser):
-    wait_time = between(1, 3)
-    token     = None
-    user_id   = None
-
     def on_start(self):
-        """Login once per simulated user."""
-        r = self.client.post("/auth/login", data={
-            "email":    TEST_EMAIL,
-            "password": TEST_PASSWORD,
-        })
+        uid = next(_user_counter)
+        email = TEST_EMAIL_TEMPLATE.format(uid)
+        # Try login first, register if not found
+        r = self.client.post("/auth/login", data={"email": email, "password": TEST_PASSWORD})
+        if r.status_code != 200:
+            self.client.post("/auth/register", data={"email": email, "name": f"LoadUser{uid}", "password": TEST_PASSWORD})
+            r = self.client.post("/auth/login", data={"email": email, "password": TEST_PASSWORD})
         if r.status_code == 200:
             d = r.json()
             self.token   = d.get("token")
@@ -26,6 +26,8 @@ class ClarixUser(HttpUser):
         else:
             self.token   = None
             self.user_id = None
+            # Stop this user entirely — no point running tasks without auth
+            raise StopUser()
 
     def auth_headers(self):
         return {"Authorization": f"Bearer {self.token}"} if self.token else {}

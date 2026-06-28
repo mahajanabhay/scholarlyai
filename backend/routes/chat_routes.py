@@ -1,6 +1,7 @@
-from email import generator
+from email import generator, message
 from fastapi import HTTPException
 
+from backend import db
 from backend.core.llm import client, LLM_MODEL
 import asyncio
 import io
@@ -28,14 +29,13 @@ text_splitter = RecursiveCharacterTextSplitter(
     length_function=len,
 )
 
-def add_to_memory(text: str, session_id: str) -> None:
+def add_to_memory(text: str, user_id: str) -> None:
     try:
         chunks = text_splitter.split_text(text)
-        get_vector_db(session_id).add_texts(texts=chunks)
-        print(f"✅ [{session_id}] Added {len(chunks)} chunks to vector store")
+        get_vector_db(f"user_{user_id}").add_texts(texts=chunks)
+        print(f"✅ [user_{user_id}] Added {len(chunks)} chunks to vector store")
     except Exception as e:
-        print(f"❌ [{session_id}] Indexing error: {e}")
-
+        print(f"❌ [user_{user_id}] Indexing error: {e}")
 
 NON_ACADEMIC_REPLY = (
     "I'm ScholarlyAI — a strictly academic assistant. I can only help with "
@@ -321,24 +321,6 @@ async def chat_endpoint(
             yield NON_ACADEMIC_REPLY
         return StreamingResponse(_refuse(), media_type="text/plain")
 
-    # Groq availability check — fast fail before streaming starts
-    try:
-        from backend.core.llm import client as _client
-        await asyncio.wait_for(
-            asyncio.to_thread(
-                _client.chat.completions.create,
-                model=LLM_MODEL,
-                messages=[{"role": "user", "content": "ping"}],
-                max_tokens=1,
-                timeout=3.0,
-            ),
-            timeout=4.0,
-        )
-    except Exception:
-        def _unavailable():
-            yield "⚠️ The AI service is temporarily unavailable. Please try again in a moment."
-        return StreamingResponse(_unavailable(), media_type="text/plain")
-
     try:
         # NEW
         user_id      = current_user["user_id"]
@@ -376,7 +358,7 @@ async def chat_endpoint(
                         raw_text += extracted + "\n"
 
                 if raw_text.strip():
-                    background_tasks.add_task(add_to_memory, raw_text, session_id)
+                    await asyncio.to_thread(add_to_memory, raw_text, user_id)
                     context_from_files += f"\n--- {file.filename} ---\n{raw_text[:1500]}"
             else:
                 try:
@@ -386,7 +368,7 @@ async def chat_endpoint(
                 except UnicodeDecodeError:
                     print(f"❌ Could not decode file: {file.filename}")
 
-        db   = get_vector_db(session_id)
+        db   = get_vector_db(f"user_{user_id}")
         docs = await asyncio.to_thread(db.similarity_search, message, k=3)
         db_context = "\n".join([doc.page_content for doc in docs])
 
@@ -422,14 +404,13 @@ async def chat_endpoint(
             # Award streak for real study exchange
             try:
                 from backend.services.memory_service import touch_streak
-                touch_streak(current_user["user_id"])
+                background_tasks.add_task(touch_streak, current_user["user_id"])
             except Exception:
                 pass
 
-            # Record study progress
             try:
                 from backend.db import record_progress
-                record_progress(user_id, study_minutes=1)
+                background_tasks.add_task(record_progress, user_id, 1)
             except Exception:
                 pass
 
@@ -451,21 +432,22 @@ async def get_chat_history(
     current_user: dict = Depends(get_current_user)
 ):
     from backend.db import get_connection, release_connection
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute(
-            """SELECT role, content, mode FROM chat_sessions
-               WHERE user_id = %s AND session_id = %s
-               ORDER BY created_at ASC
-               LIMIT %s OFFSET %s""",
-            (current_user["user_id"], session_id, limit, offset)
-        )
-        rows = cur.fetchall()
-        history = [{"role": r[0], "content": r[1], "mode": r[2]} for r in rows]
-        return {"history": history, "limit": limit, "offset": offset, "count": len(history)}
-    finally:
-        release_connection(conn)
+
+    def _fetch():
+        conn = get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """SELECT role, content, mode FROM chat_sessions
+                WHERE user_id = %s AND session_id = %s
+                ORDER BY created_at ASC
+                LIMIT %s OFFSET %s""",
+                (current_user["user_id"], session_id, limit, offset)
+            )
+            return cur.fetchall()
+        finally:
+            release_connection(conn)
+    rows = await asyncio.to_thread(_fetch)
 
 
 @router.get("/chat/sessions")

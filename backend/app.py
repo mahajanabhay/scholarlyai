@@ -50,7 +50,8 @@ async def lifespan(app: FastAPI):
                 print(f"⚠️ Notification scheduler error: {e}")
             await _asyncio.sleep(6 * 60 * 60)  # every 6 hours
 
-    _asyncio.create_task(_notification_loop())
+    loop = _asyncio.get_event_loop()
+    loop.create_task(_notification_loop())
 
     try:
         from backend.core.config import KNOWLEDGE_UPLOAD_DIR
@@ -71,7 +72,8 @@ async def lifespan(app: FastAPI):
             print("✅ Per-user knowledge bases re-indexed.")
 
         import asyncio as _asyncio
-        _asyncio.create_task(_reindex_all())
+        loop = _asyncio.get_event_loop()
+        loop.create_task(_reindex_all())
     except Exception as e:
         print(f"⚠️  Chroma re-index skipped: {e}")
 
@@ -117,7 +119,10 @@ async def health_check():
         cur.execute("SELECT 1")
         release_connection(conn)
         status["db"] = "ok"
-        status["pool_available"] = connection_pool.maxconn - len(connection_pool._used)
+        try:
+            status["pool_available"] = connection_pool.maxconn - len(connection_pool._used)
+        except AttributeError:
+            status["pool_available"] = -1
     except Exception as e:
         status["db_error"] = str(e)
 

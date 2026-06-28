@@ -23,6 +23,14 @@ export default function KnowledgePanel() {
   const upload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.pdf') || file.type !== 'application/pdf') {
+      setMsg({ ok: false, text: 'Only PDF files are supported.' });
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      setMsg({ ok: false, text: 'File exceeds 20MB limit.' });
+      return;
+    }
     setUploading(true);
     setMsg(null);
     const fd = new FormData();
@@ -40,7 +48,7 @@ export default function KnowledgePanel() {
       setMsg({ ok: false, text: "Upload failed." });
     } finally {
       setUploading(false);
-      fileRef.current.value = "";
+      if (fileRef.current) fileRef.current.value = "";
     }
   };
 

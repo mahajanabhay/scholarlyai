@@ -60,6 +60,11 @@ export default function OnboardingModal({ userId, onComplete, apiFetch }) {
     const subject = selected[0] || "General Knowledge";
     try {
       const wasLastQuestion = questionNum >= TOTAL_QUIZ_QUESTIONS;
+
+      // Extract correct answer letter from question before submitting
+      const answerLine = currentQuestion.split('\n').find(l => l.trim().toUpperCase().startsWith('ANSWER:'));
+      const correctLetter = answerLine ? answerLine.split(':')[1].trim().toUpperCase().charAt(0) : null;
+
       const fd = new FormData();
       fd.append("message", userAnswer.trim());
       fd.append("session_id", sessionId);
@@ -74,7 +79,10 @@ export default function OnboardingModal({ userId, onComplete, apiFetch }) {
       const res = await apiFetch(`${API_URL}/quiz`, { method: "POST", body: fd });
       const data = await res.json();
 
-      if (data.is_correct) setCorrectCount(c => c + 1);
+      const isCorrect = correctLetter
+        ? userAnswer.trim().toUpperCase().charAt(0) === correctLetter
+        : data.is_correct;
+      if (isCorrect) setCorrectCount(c => c + 1);
       setFeedback(data.feedback || "");
 
       if (wasLastQuestion) {
@@ -164,7 +172,7 @@ export default function OnboardingModal({ userId, onComplete, apiFetch }) {
               Question {questionNum} of {TOTAL_QUIZ_QUESTIONS}
             </h2>
             <p style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.7)", margin: "0 0 1.25rem", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-              {currentQuestion}
+              {currentQuestion.split('\n').filter(l => !l.trim().toUpperCase().startsWith('ANSWER:')).join('\n')}
             </p>
             <textarea
               value={userAnswer}

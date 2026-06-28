@@ -30,18 +30,20 @@ def _user_session(user_id: str) -> str:
     return f"user_{user_id}"
 
 
-def require_admin(current_user: dict = Depends(get_current_user)):
+async def require_admin(current_user: dict = Depends(get_current_user)):
     from backend.db import get_connection, release_connection
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT is_admin FROM users WHERE id = %s", (current_user["user_id"],))
-        row = cur.fetchone()
-        if not row or not row[0]:
-            raise HTTPException(status_code=403, detail="Admin access required.")
-        return current_user
-    finally:
-        release_connection(conn)
+    def _check():
+        conn = get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT is_admin FROM users WHERE id = %s", (current_user["user_id"],))
+            return cur.fetchone()
+        finally:
+            release_connection(conn)
+    row = await asyncio.to_thread(_check)
+    if not row or not row[0]:
+        raise HTTPException(status_code=403, detail="Admin access required.")
+    return current_user
 
 
 @router.post("/knowledge/upload")
@@ -58,8 +60,10 @@ async def upload_document(
     if not content.startswith(b"%PDF"):
         raise HTTPException(status_code=400, detail="Invalid PDF file.")
 
-    safe_name = os.path.basename(file.filename).replace(" ", "_")
-    if not safe_name or safe_name.startswith("."):
+    import re
+    safe_name = os.path.basename(file.filename or "").replace(" ", "_")
+    safe_name = re.sub(r"[^\w\-.]", "", safe_name)  # allowlist: word chars, hyphens, dots
+    if not safe_name or not safe_name.lower().endswith(".pdf") or safe_name.startswith("."):
         raise HTTPException(status_code=400, detail="Invalid filename.")
 
     user_id    = current_user["user_id"]
@@ -68,13 +72,28 @@ async def upload_document(
 
     existing = glob.glob(os.path.join(upload_dir, "*.pdf"))
     if len(existing) >= 20:
-        raise HTTPException(status_code=400, detail="Maximum 20 documents per user. Delete some to upload more.")
+        raise HTTPException(status_code=400, detail="Maximum 20 documents per user.")
 
     save_path = os.path.join(upload_dir, safe_name)
     with open(save_path, "wb") as f:
         f.write(content)
 
+    # Re-check post-write
+    if len(glob.glob(os.path.join(upload_dir, "*.pdf"))) > 20:
+        os.remove(save_path)
+        raise HTTPException(status_code=400, detail="Maximum 20 documents per user.")
+
     try:
+        # Evict stale cache entry so get_vector_db recreates a clean collection
+        from backend.services.vector_service import _db_cache, _db_cache_lock
+        with _db_cache_lock:
+            _db_cache.pop(session_id, None)
+
+        # Wipe and rebuild the Chroma collection from scratch
+        chroma_dir = os.path.join(CHROMA_BASE, session_id)
+        if os.path.exists(chroma_dir):
+            shutil.rmtree(chroma_dir)
+
         await asyncio.to_thread(ingest_pdfs, upload_dir, session_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {e}")
@@ -108,12 +127,14 @@ async def delete_document(
     os.remove(file_path)
 
     try:
-        chroma_dir = os.path.join(CHROMA_BASE, session_id)
-        if os.path.exists(chroma_dir):
-            shutil.rmtree(chroma_dir)
         remaining = glob.glob(os.path.join(upload_dir, "*.pdf"))
+        chroma_dir = os.path.join(CHROMA_BASE, session_id)
         if remaining:
             await asyncio.to_thread(ingest_pdfs, upload_dir, session_id)
+        else:
+            # No files left — safe to wipe
+            if os.path.exists(chroma_dir):
+                shutil.rmtree(chroma_dir)
     except Exception as e:
         print(f"⚠️ Re-ingest after delete failed: {e}")
 

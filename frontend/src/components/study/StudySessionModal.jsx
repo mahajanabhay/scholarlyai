@@ -33,9 +33,16 @@ export default function StudySessionModal({ userId, onClose, onStartQuiz }) {
     setStep('running');
     const sid = `study_${userId}_${Date.now()}`;
     setSessionId(sid);
-    const data = await fetchNextQuestion(null, null, 1, true, sid);
-    if (data?.new_question) setQuestions([data.new_question]);
-    setLoading(false);
+    try {
+      const data = await fetchNextQuestion(null, null, 1, true, sid);
+      if (!data?.new_question) throw new Error('No question returned');
+      setQuestions([data.new_question]);
+    } catch (e) {
+      console.error('Failed to start session:', e);
+      setStep('pick');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchNextQuestion = async (prevAnswer, prevQ, qNum, isStart, sid = sessionId) => {
@@ -47,7 +54,12 @@ export default function StudySessionModal({ userId, onClose, onStartQuiz }) {
     fd.append('question_number', qNum);
     fd.append('is_starting',     isStart ? 'true' : 'false');
     fd.append('user_id',         userId);
-    fd.append('last_was_wrong',  'false');
+    const prevWasWrong = feedbacks.length > 0 && (
+      feedbacks[feedbacks.length - 1].toLowerCase().includes('incorrect') ||
+      feedbacks[feedbacks.length - 1].toLowerCase().includes('wrong') ||
+      feedbacks[feedbacks.length - 1].toLowerCase().includes('not correct')
+    );
+    fd.append('last_was_wrong', prevWasWrong ? 'true' : 'false');
     if (prevQ) fd.append('last_question', prevQ);
     const r    = await apiFetch(`${API_URL}/quiz`, { method: 'POST', body: fd });
     const data = await r.json();
@@ -69,8 +81,13 @@ export default function StudySessionModal({ userId, onClose, onStartQuiz }) {
     fd.append('is_starting',     'false');
     fd.append('user_id',         userId);
     fd.append('last_question',   qText);
-    fd.append('last_was_wrong',  'false');
-    const r    = await apiFetch(`${API_URL}/quiz`, { method: 'POST', body: fd });
+    const prevWasWrong = feedbacks.length > 0 && (
+    feedbacks[feedbacks.length - 1].toLowerCase().includes('incorrect') ||
+    feedbacks[feedbacks.length - 1].toLowerCase().includes('wrong') ||
+    feedbacks[feedbacks.length - 1].toLowerCase().includes('not correct')
+  );
+  fd.append('last_was_wrong', prevWasWrong ? 'true' : 'false');
+  const r = await apiFetch(`${API_URL}/quiz`, { method: 'POST', body: fd });
     const data = await r.json();
 
     const fb = data.feedback || '';
@@ -87,7 +104,10 @@ export default function StudySessionModal({ userId, onClose, onStartQuiz }) {
     } else {
       // Done
       const correctCount = newFeedbacks.filter(f =>
-        !f.toLowerCase().includes('incorrect') && !f.toLowerCase().includes('wrong') && !f.toLowerCase().includes('not correct')
+        f.length > 0 &&
+        !f.toLowerCase().includes('incorrect') &&
+        !f.toLowerCase().includes('wrong') &&
+        !f.toLowerCase().includes('not correct')
       ).length;
       setScore(correctCount);
       setStep('results');
@@ -217,7 +237,7 @@ export default function StudySessionModal({ userId, onClose, onStartQuiz }) {
                 <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide">Question Breakdown</p>
                 {questions.slice(0, TOTAL).map((q, i) => {
                   const fb = feedbacks[i] || '';
-                  const wrong = data.is_correct === false;
+                  const wrong = fb.toLowerCase().includes('incorrect') || fb.toLowerCase().includes('wrong') || fb.toLowerCase().includes('not correct');
                   const qParsed = parseQuestion(q);
                   return (
                     <div key={i} className={`p-3 rounded-xl border text-xs ${wrong ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20' : 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20'}`}>
