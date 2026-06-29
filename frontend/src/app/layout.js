@@ -13,13 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "ScholarlyAI — Your AI Study Partner",
-  description: "Learn, quiz, summarise and analyse any topic with ScholarlyAI. Upload your textbooks and study smarter.",
-  keywords: "ScholarlyAI, study, AI, quiz, learning, education",
-  authors: [{ name: "ScholarlyAI" }],
+  title: "Clarix — Your AI Study Partner",
+  description: "Learn, quiz, summarise and analyse any topic with Clarix. Upload your textbooks and study smarter.",
+  keywords: "Clarix, study, AI, quiz, learning, education",
+  authors: [{ name: "Clarix" }],
   openGraph: {
-    title: "ScholarlyAI — Your AI Study Partner",
-    description: "Learn, quiz, summarise and analyse any topic with ScholarlyAI",
+    title: "Clarix — Your AI Study Partner",
+    description: "Learn, quiz, summarise and analyse any topic with Clarix",
     type: "website",
   },
 };
