@@ -6,6 +6,7 @@ from backend.core.llm import client, LLM_MODEL
 import asyncio
 import io
 import json
+import traceback
 from typing import List
 
 from fastapi import APIRouter, BackgroundTasks, File, UploadFile, Depends
@@ -269,15 +270,25 @@ Context:
         except asyncio.TimeoutError:
             yield "\n\n⚠️ **Response timed out.** Groq is taking too long — please try again."
         except Exception as e:
+            print("=" * 80)
+            print("LLM ERROR")
+            print(f"Type: {type(e)}")
+            print(f"Exception: {repr(e)}")
+            traceback.print_exc()
+            print("=" * 80)
+
             err = str(e).lower()
+
             if "timeout" in err or "timed out" in err:
                 yield "\n\n⚠️ **Response timed out.** Groq is taking too long — please try again."
-            elif "rate" in err or "429" in err:
+
+            elif "429" in err or "rate" in err:
                 yield "\n\n⚠️ **Rate limit reached.** Please wait a moment before sending another message."
+
             elif "connect" in err or "network" in err:
                 yield "\n\n⚠️ **Connection error.** Check your internet and try again."
+
             else:
-                print(f"[generate] Unhandled error: {e}")
                 yield "\n\n⚠️ **Something went wrong.** Please try again."
     return generate
 
