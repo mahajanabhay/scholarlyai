@@ -441,7 +441,7 @@ async def quiz_endpoint(
         if quiz_mem["asked_questions"]:
             asked_summary = (
                 "PREVIOUSLY ASKED QUESTIONS (NEVER ask similar or identical questions again):\n"
-                + "\n".join([f"{i+1}. {q}" for i, q in enumerate(quiz_mem["asked_questions"])])
+                + "\n".join([f"{i+1}. {q}" for i, q in enumerate(quiz_mem["asked_questions"][-10:])])
                 + "\n\n"
             )
 
@@ -488,7 +488,7 @@ async def quiz_endpoint(
                 },
                 {"role": "user", "content": quiz_prompt},
             ],
-            max_tokens=MAX_TOKENS,
+            max_tokens=1000,
             temperature=0.7,
         )
 
@@ -576,7 +576,7 @@ async def get_answers_endpoint(
         db = get_vector_db(f"user_{current_user['user_id']}")
         search_query = quiz_mem["quiz_topic"]
         docs = await asyncio.to_thread(db.similarity_search, search_query, k=5)
-        context = "\n".join([doc.page_content for doc in docs])
+        context = "\n".join([doc.page_content for doc in docs])[:2000]
 
         question_paper = paper_content or quiz_mem.get("question_paper", "")
         if not question_paper:
