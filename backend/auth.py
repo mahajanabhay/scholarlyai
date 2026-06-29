@@ -167,10 +167,6 @@ def check_email_verified(email: str) -> bool:
         release_connection(conn)
 
 def authenticate_user(email: str, password: str) -> tuple[bool, str, User]:
-    """
-    Authenticate user with email and password.
-    Returns: (success: bool, message: str, user: User or None)
-    """
     email = email.lower().strip()
     
     user = get_user_by_email(email)
@@ -178,14 +174,11 @@ def authenticate_user(email: str, password: str) -> tuple[bool, str, User]:
         return False, "User not found", None
     
     if not verify_password(password, user.password_hash):
-            return False, "Invalid password", None
+        return False, "Invalid password", None
 
-    if not check_email_verified(email):
-            return False, "Please verify your email before logging in.", None
+    # Email verification disabled for beta
     
     return True, "Authentication successful", user
-
-
 # ─────────────────────────────────────────────
 # SESSION MANAGEMENT (reverse lookup only — via PostgreSQL)
 # ─────────────────────────────────────────────
