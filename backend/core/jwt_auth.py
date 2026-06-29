@@ -2,7 +2,7 @@
 JWT Authentication Utility
 Handles token creation and verification
 """
-import jwt
+from jose import jwt
 from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException, Header
 from typing import Optional
