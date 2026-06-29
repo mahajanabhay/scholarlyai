@@ -85,7 +85,7 @@ export default function LoginPage() {
             <span className="text-2xl">📚</span>
           </div>
           <h1 className="text-3xl font-bold text-zinc-900 dark:text-white mb-2">
-            ScholarlyAI
+            Clarix
           </h1>
           <p className="text-zinc-600 dark:text-zinc-400">
             Welcome back! Sign in to your account

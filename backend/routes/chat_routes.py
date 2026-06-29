@@ -38,7 +38,7 @@ def add_to_memory(text: str, user_id: str) -> None:
         print(f"❌ [user_{user_id}] Indexing error: {e}")
 
 NON_ACADEMIC_REPLY = (
-    "I'm ScholarlyAI — a strictly academic assistant. I can only help with "
+    "I'm Clarix — a strictly academic assistant. I can only help with "
     "study-related topics such as science, mathematics, history, literature, "
     "engineering, medicine, law, economics, philosophy, and similar academic subjects. "
     "Please ask me something academic and I'll be happy to help! 📚"
@@ -128,7 +128,7 @@ def get_ai_response(user_query: str, history: list, mode: str, context: str, tri
     selected_instruction = mode_instructions.get(mode, "Act as an expert academic assistant.")
 
     if mode == "CODE":
-        system_prompt = f"""You are 'ScholarlyAI Code', an expert programming and computer science tutor.
+        system_prompt = f"""You are 'Clarix Code', an expert programming and computer science tutor.
 {selected_instruction}
 
 **RESPONSE FORMAT (strictly follow for every coding question):**
@@ -175,7 +175,7 @@ Every response MUST follow this exact visual sequence:
 * *Misconception*: What students often get wrong.
 * *Correction*: The accurate explanation.
 """
-        system_prompt = f"""You are 'ScholarlyAI', a strict, expert academic study assistant. {selected_instruction}
+        system_prompt = f"""You are 'Clarix', a strict, expert academic study assistant. {selected_instruction}
 
 {template_instruction}
 
@@ -196,7 +196,7 @@ Context:
 {context[:3000]}
 """
     else:
-        system_prompt = f"""You are 'ScholarlyAI', a strict, expert academic study assistant. {selected_instruction}
+        system_prompt = f"""You are 'Clarix', a strict, expert academic study assistant. {selected_instruction}
 
 **Quality Standards for All Responses:**
 - Provide EXACT, CLEAN, DETAILED explanations without misleading information.

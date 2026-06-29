@@ -756,7 +756,7 @@ export default function Dashboard() {
                 <div className="w-7 h-7 bg-linear-to-br from-violet-600 to-indigo-700 rounded-lg flex items-center justify-center shadow-md">
                   <GraduationCap className="text-white" size={14} />
                 </div>
-                <span className="text-sm font-bold text-zinc-900 dark:text-white tracking-tight">ScholarlyAI</span>
+                <span className="text-sm font-bold text-zinc-900 dark:text-white tracking-tight">Clarix</span>
               </div>
               <button onClick={() => setIsSidebarOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-white/[0.07] transition">
                 <Menu size={16} />
@@ -979,7 +979,7 @@ export default function Dashboard() {
 
             {/* Centre — app name (matches ChatGPT 'ChatGPT ˅') */}
             <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5">
-              <span className="text-sm font-semibold text-zinc-900 dark:text-white">ScholarlyAI</span>
+              <span className="text-sm font-semibold text-zinc-900 dark:text-white">Clarix</span>
               <ChevronDown size={14} className="text-zinc-400 dark:text-zinc-600" />
             </div>
 
@@ -1295,7 +1295,7 @@ export default function Dashboard() {
                         ? "Ask a coding question or describe what to build…"
                         : quizType === "paper"
                           ? "e.g., 10 questions on photosynthesis"
-                          : "Ask ScholarlyAI…"
+                          : "Ask Clarix…"
                     }
                     className={`flex-1 bg-transparent border-none outline-none p-2 resize-none text-sm leading-relaxed ${mode === 'CODE' ? 'text-zinc-100 placeholder-zinc-500' : 'text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500'}`}
                   />
