@@ -102,12 +102,7 @@ function RetryQuiz({ subject, weakQuestions, onClose, onDone }) {
   }
 
   const q = questions[current];
-  const opts = [
-    { letter: 'A', text: q.option_a || q.a },
-    { letter: 'B', text: q.option_b || q.b },
-    { letter: 'C', text: q.option_c || q.c },
-    { letter: 'D', text: q.option_d || q.d },
-  ].filter(o => o.text);
+  const opts = (q.options || []).map(o => ({ letter: o.letter, text: o.text }));
 
   return (
     <div className="space-y-4">

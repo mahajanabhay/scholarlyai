@@ -110,6 +110,50 @@ def _current_iso_week(date_str: str) -> str:
     return f"{d.isocalendar()[0]}-W{d.isocalendar()[1]:02d}"
 
 
+def use_streak_freeze(user_id: str) -> dict | None:
+    """
+    Manually consume an available freeze to protect a streak at risk of
+    breaking. Returns None if no freeze is available, the streak is already
+    active today (no risk), or it's been more than 2 days (too late to save).
+    """
+    from datetime import date as dt, timedelta
+    today = datetime.now(timezone.utc).date().isoformat()
+
+    with _streaks_lock:
+        streak = get_streak(user_id)
+        last   = streak["last_active"]
+
+        if last == today:
+            return None  # streak already active today — nothing to protect
+
+        yesterday    = (dt.fromisoformat(today) - timedelta(days=1)).isoformat()
+        two_days_ago = (dt.fromisoformat(today) - timedelta(days=2)).isoformat()
+        this_week    = _current_iso_week(today)
+
+        if streak["freeze_week"] != this_week:
+            streak["freeze_used"] = False
+
+        if streak["freeze_used"]:
+            return None  # already used this week
+        if last not in (yesterday, two_days_ago):
+            return None  # too far gone — freeze can't save it
+
+        streak["current"]        += 1
+        streak["freeze_used"]     = True
+        streak["freeze_week"]     = this_week
+        streak["recovered_today"] = True
+        streak["last_active"]     = today
+        streak["longest"]         = max(streak["longest"], streak["current"])
+
+    try:
+        upsert_streak(user_id, streak)
+        cache_set(f"streak:{user_id}", streak)
+    except Exception as e:
+        print(f"⚠️ [streak] DB upsert failed for {user_id}: {e}")
+
+    return streak
+
+
 def touch_streak(user_id: str, client_date: str | None = None):
     from datetime import date as dt, timedelta
     today = datetime.now(timezone.utc).date().isoformat()
@@ -132,12 +176,10 @@ def touch_streak(user_id: str, client_date: str | None = None):
 
         if last == yesterday:
             streak["current"] += 1
-        elif last == two_days_ago and not streak["freeze_used"]:
-            streak["current"]        += 1
-            streak["freeze_used"]     = True
-            streak["freeze_week"]     = this_week
-            streak["recovered_today"] = True
         else:
+            # Two-day gap is no longer auto-saved — user must manually
+            # consume a freeze via /streak/{user_id}/use-freeze before
+            # this point, or the streak resets.
             streak["current"] = 1
 
         streak["longest"]     = max(streak["longest"], streak["current"])

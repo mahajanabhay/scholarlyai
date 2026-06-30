@@ -63,6 +63,7 @@ export default function Dashboard() {
   const [forgotLoading, setForgotLoading]           = useState(false);
   const [showAdmin, setShowAdmin]       = useState(false);
   const [isAdmin, setIsAdmin]           = useState(false);
+  const [showStudyPicker, setShowStudyPicker] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery]       = useState("");
@@ -117,6 +118,8 @@ export default function Dashboard() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [weeklyProgress, setWeeklyProgress] = useState(null);
   const [aiUnavailable, setAiUnavailable] = useState(false);
+  const [showFreezeConfirm, setShowFreezeConfirm] = useState(false);
+  const [freezeLoading, setFreezeLoading]         = useState(false);
 
   const chatEndRef         = useRef(null);
   const abortControllerRef = useRef(null);
@@ -392,8 +395,17 @@ apiFetch(`${API_URL}/chat/sessions`).then(r => r.json()).then(async (d) => {
   };
 
   // ── Quiz type selection ────────────────────
-  const selectQuizType = (type) => {
-    setQuizType(type);
+  // Maps UX-facing quiz types to backend quiz_type values — no backend change needed.
+  // 'practice' and 'challenge' both use 'single', differing only in difficulty hint
+  // sent via the message text; 'custom' uses 'paper' for multi-question generation.
+  const selectQuizType = (uxType) => {
+    const BACKEND_TYPE = {
+      single:    'single',
+      practice:  'single',
+      challenge: 'single',
+      custom:    'paper',
+    };
+    setQuizType(BACKEND_TYPE[uxType] || uxType);
     setIsQuizTypeDropdownOpen(false);
   };
 
@@ -1054,9 +1066,19 @@ apiFetch(`${API_URL}/chat/sessions`).then(r => r.json()).then(async (d) => {
                     {quizType ? (quizType === 'single' ? 'Single Q' : 'Paper') : 'Quiz type'} <ChevronDown size={12} />
                   </button>
                   {isQuizTypeDropdownOpen && (
-                    <div className="absolute top-full right-0 mt-2 w-36 rounded-2xl overflow-hidden shadow-2xl z-50 bg-zinc-800 dark:bg-[#1c1c1e] border border-zinc-700 dark:border-white/10">
-                      <button onClick={() => selectQuizType('single')} className={`w-full text-left px-4 py-2.5 text-sm ${quizType === 'single' ? 'text-zinc-900 dark:text-white font-semibold bg-zinc-100 dark:bg-white/8' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'}`}>Single Question</button>
-                      <button onClick={() => selectQuizType('paper')} className={`w-full text-left px-4 py-2.5 text-sm ${quizType === 'paper' ? 'text-zinc-900 dark:text-white font-semibold bg-zinc-100 dark:bg-white/8' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'}`}>Question Paper</button>
+                    <div className="absolute top-full right-0 mt-2 w-52 rounded-2xl overflow-hidden shadow-2xl z-50 bg-zinc-800 dark:bg-[#1c1c1e] border border-zinc-700 dark:border-white/10">
+                      {[
+                        { type: 'single',    label: 'Single MCQ',     desc: 'One question at a time' },
+                        { type: 'practice',  label: 'Practice Quiz',  desc: 'Relaxed pace, hints allowed' },
+                        { type: 'challenge', label: 'Challenge Quiz', desc: 'Harder, timed questions' },
+                        { type: 'custom',    label: 'Custom Quiz',    desc: 'Full question paper' },
+                      ].map(({ type, label, desc }) => (
+                        <button key={type} onClick={() => selectQuizType(type)}
+                          className="w-full text-left px-4 py-2.5 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-all">
+                          <p className="font-semibold">{label}</p>
+                          <p className="text-[10px] text-zinc-600 mt-0.5">{desc}</p>
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -1138,18 +1160,41 @@ apiFetch(`${API_URL}/chat/sessions`).then(r => r.json()).then(async (d) => {
                 </div>
 
                 {/* Primary CTA: Start Study Session */}
-                <div className="w-full max-w-md mb-12">
+                <div className="w-full max-w-md mb-12 relative">
                   <button
-                    onClick={() => { setMode('QUIZ'); setQuizType('single'); setIsQuizActive(true); setMessage(''); setFiles([]); }}
+                    onClick={() => setShowStudyPicker(p => !p)}
                     className="w-full flex items-center justify-between px-8 py-5 rounded-2xl border-2 border-green-400 dark:border-green-500 bg-linear-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 hover:from-green-100 hover:to-emerald-100 dark:hover:from-green-900 dark:hover:to-emerald-900 transition-all hover:shadow-lg font-semibold text-green-900 dark:text-green-100"
                   >
                     <div className="flex items-center gap-3">
                       <Zap size={24} className="text-green-600 dark:text-green-400" />
                       <span>Start Study Session</span>
                     </div>
-                    <ChevronRight size={20} className="text-green-600 dark:text-green-400" />
+                    <ChevronRight size={20} className={`text-green-600 dark:text-green-400 transition-transform ${showStudyPicker ? 'rotate-90' : ''}`} />
                   </button>
-                  <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center mt-2">Quiz → See Weak Topics → Improve → Return Daily</p>
+                  <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center mt-2">Choose how you want to study</p>
+
+                  {showStudyPicker && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowStudyPicker(false)} />
+                      <div className="absolute top-full left-0 right-0 mt-2 rounded-2xl overflow-hidden shadow-2xl z-50 bg-white dark:bg-[#1c1c1e] border border-zinc-200 dark:border-white/10">
+                        {[
+                          { icon: BookOpen,      label: 'Learn a Topic',       desc: 'Tutor-style explanations',        color: 'text-blue-500',   action: () => { setMode('LEARN'); setShowStudyPicker(false); } },
+                          { icon: Flame,         label: 'Quick Quiz',          desc: 'Single MCQ, one at a time',       color: 'text-green-500',  action: () => { setMode('QUIZ'); setQuizType('single'); setIsQuizActive(true); setMessage(''); setFiles([]); setShowStudyPicker(false); } },
+                          { icon: AlertTriangle, label: 'Revise Weak Topics', desc: weaknessCount > 0 ? `${weaknessCount} topics to review` : 'No weak topics yet', color: 'text-orange-500', action: () => { setShowStudyPicker(false); setShowWeakness(true); } },
+                          { icon: Bot,           label: 'Ask Clarix',         desc: 'Open-ended Q&A',                  color: 'text-violet-500', action: () => { setMode('LEARN'); setShowStudyPicker(false); } },
+                        ].map(({ icon: Icon, label, desc, color, action }) => (
+                          <button key={label} onClick={action}
+                            className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-zinc-50 dark:hover:bg-white/5 transition-all text-left">
+                            <Icon size={18} className={`${color} shrink-0`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{label}</p>
+                              <p className="text-[11px] text-zinc-500 mt-0.5">{desc}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                                 
@@ -1400,10 +1445,20 @@ apiFetch(`${API_URL}/chat/sessions`).then(r => r.json()).then(async (d) => {
         <ProfilePanel
           userId={userId}
           profileData={profileData}
-          onProfileUpdate={setProfileData}
+          onProfileUpdate={(d) => {
+            setProfileData(d);
+            localStorage.setItem(`scholarly_profile_${userId}`, JSON.stringify(d));
+          }}
           xpData={xpData}
           streakData={streakData}
           onClose={() => setShowProfile(false)}
+          onLogout={() => {
+            localStorage.removeItem('scholarly_token');
+            localStorage.removeItem('scholarly_user_id');
+            localStorage.removeItem('scholarly_email');
+            localStorage.removeItem('scholarly_name');
+            window.location.href = '/login';
+          }}
         />
       )}
 
@@ -1424,7 +1479,22 @@ apiFetch(`${API_URL}/chat/sessions`).then(r => r.json()).then(async (d) => {
             >
               <X size={16} />
             </button>
-            <KnowledgePanel />
+            <KnowledgePanel
+              onQuickAction={({ prompt, isQuiz }) => {
+                setShowKnowledge(false);
+                if (isQuiz) {
+                  setMode('QUIZ');
+                  setQuizType('single');
+                  setIsQuizActive(false);
+                  setMessage(prompt);
+                  setTimeout(() => handleSend(prompt), 100);
+                } else {
+                  setMode('LEARN');
+                  setMessage(prompt);
+                  setTimeout(() => handleSend(prompt), 100);
+                }
+              }}
+            />
           </div>
         </div>
       )}
@@ -1551,14 +1621,78 @@ apiFetch(`${API_URL}/chat/sessions`).then(r => r.json()).then(async (d) => {
                         ))}
                       </div>
                     </div>
-                    <div className="px-5 py-3 flex items-center justify-between rounded-b-2xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderTop: 'none' }}>
-                      <span className="text-xs font-semibold text-zinc-400">
-                        {streakData?.recovered_today ? '❄️ Streak saved by freeze!' : streakData?.freeze_used ? '❄️ Freeze used this week' : '❄️ Streak freeze ready'}
-                      </span>
-                      {!streakData?.freeze_used && !streakData?.recovered_today && (
-                        <span className="text-xs text-blue-400 font-semibold">1 available</span>
-                      )}
+                    <div className="px-5 py-3 rounded-b-2xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderTop: 'none' }}>
+                      {(() => {
+                        const today = new Date().toISOString().split('T')[0];
+                        const isAtRisk = streakData?.last_active && streakData.last_active !== today;
+                        const freezeAvailable = !streakData?.freeze_used;
+
+                        if (streakData?.recovered_today) {
+                          return <span className="text-xs font-semibold text-blue-400">❄️ Streak saved by freeze!</span>;
+                        }
+
+                        if (isAtRisk && freezeAvailable) {
+                          return (
+                            <button
+                              onClick={() => setShowFreezeConfirm(true)}
+                              className="w-full flex items-center justify-between text-left"
+                            >
+                              <span className="text-xs font-semibold text-amber-400">⚠️ Streak at risk — use freeze?</span>
+                              <span className="text-xs text-blue-400 font-bold underline">Use Freeze</span>
+                            </button>
+                          );
+                        }
+
+                        return (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-zinc-400">
+                              {streakData?.freeze_used ? '❄️ Freeze used this week' : '❄️ Streak freeze ready'}
+                            </span>
+                            {freezeAvailable && (
+                              <span className="text-xs text-blue-400 font-semibold">1 available</span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
+
+                    {showFreezeConfirm && (
+                      <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowFreezeConfirm(false)}>
+                        <div className="bg-[#16161a] border border-blue-500/20 rounded-2xl p-6 w-75 text-center space-y-3" onClick={e => e.stopPropagation()}>
+                          <span className="text-3xl">❄️</span>
+                          <p className="text-sm font-bold text-white">Use your streak freeze?</p>
+                          <p className="text-xs text-zinc-500">This protects your {streakData?.current || 0}-day streak. You only get one freeze per week.</p>
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              disabled={freezeLoading}
+                              onClick={async () => {
+                                setFreezeLoading(true);
+                                try {
+                                  const r = await apiFetch(`${API_URL}/streak/${userId}/use-freeze`, { method: 'POST' });
+                                  if (r.ok) {
+                                    const d = await r.json();
+                                    setStreakData(d);
+                                    localStorage.setItem(`scholarly_streak_${userId}`, JSON.stringify(d));
+                                  }
+                                } catch (e) {
+                                  console.error('[freeze]', e);
+                                } finally {
+                                  setFreezeLoading(false);
+                                  setShowFreezeConfirm(false);
+                                }
+                              }}
+                              className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all disabled:opacity-50"
+                            >
+                              {freezeLoading ? 'Applying…' : 'Use Freeze'}
+                            </button>
+                            <button onClick={() => setShowFreezeConfirm(false)} disabled={freezeLoading}
+                              className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 text-xs font-bold transition-all">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   {/* XP */}
                   <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, #7c3aed, #4338ca)', border: '1px solid rgba(139,92,246,0.3)' }}>

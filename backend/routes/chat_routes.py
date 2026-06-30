@@ -45,6 +45,38 @@ NON_ACADEMIC_REPLY = (
     "Please ask me something academic and I'll be happy to help! 📚"
 )
 
+# ── Intent detection ─────────────────────────────────────────────────────
+_INTENT_PATTERNS = [
+    ("compare",   ["compare", "vs", "versus", "difference between"]),
+    ("debug",     ["error", "bug", "not working", "fix this", "traceback"]),
+    ("howto",     ["how do i", "how to", "steps to", "implement"]),
+    ("why",       ["why does", "why is", "why do", "reason for"]),
+    ("design",    ["design", "architecture", "system design", "build a"]),
+    ("interview", ["interview question", "interview prep", "asked in interview"]),
+    ("research",  ["research", "literature review", "state of the art", "papers on"]),
+]
+
+def detect_intent(query: str) -> str:
+    q = query.lower()
+    for intent, keywords in _INTENT_PATTERNS:
+        if any(k in q for k in keywords):
+            return intent
+    return "explain"
+
+_DEPTH_KEYWORDS = {
+    "beginner":     ["explain simply", "eli5", "for a beginner", "in simple terms"],
+    "advanced":     ["in depth", "advanced", "rigorous", "formal proof", "graduate level"],
+}
+
+def detect_depth(query: str, stored_level: str | None) -> str:
+    q = query.lower()
+    for level, keywords in _DEPTH_KEYWORDS.items():
+        if any(k in q for k in keywords):
+            return level
+    if stored_level:
+        return stored_level
+    return "intermediate"
+
 # ── Local pre-filter ──────────────────────────────────────────────────────
 # Obvious non-academic patterns caught locally — no LLM call needed.
 # Keeps latency near-zero for the most common rejection cases.
@@ -108,7 +140,7 @@ def is_academic_query(user_query: str) -> bool:
         return True
 
 
-def get_ai_response(user_query: str, history: list, mode: str, context: str, trigger_scholarly_template: bool):
+def get_ai_response(user_query: str, history: list, mode: str, context: str, trigger_scholarly_template: bool, stored_level: str | None = None):
     mode_instructions = {
         "LEARN":    "Act as an expert tutor. Provide clear, structured, comprehensive explanations with examples.",
         "QUIZ":     "Act as a rigorous examiner. Generate challenging, well-formed questions that test deep understanding.",
@@ -147,74 +179,66 @@ def get_ai_response(user_query: str, history: list, mode: str, context: str, tri
 {context[:1500]}
 """
     elif trigger_scholarly_template:
-        template_instruction = """
-Every response MUST follow this exact visual sequence:
-### **[TOPIC NAME IN BOLD]**
-*Concise, clear explanation of the main concept*
+        intent       = detect_intent(user_query)
+        depth        = detect_depth(user_query, stored_level)
 
-### **Core Concept Breakdown**
-* **Key Term 1**: Precise definition and explanation.
-* **Key Term 2**: Precise definition and explanation.
+        _STRUCTURES = {
+            "compare":   "1) Direct answer comparing both.\n2) Side-by-side key differences (bullets).\n3) When to use each.\n4) One example.",
+            "debug":     "1) Direct diagnosis of the issue.\n2) Root cause (brief).\n3) Fix with code/steps.\n4) How to avoid it next time.",
+            "howto":     "1) Direct answer — the steps.\n2) Brief why behind each non-obvious step.\n3) One worked example.",
+            "why":       "1) Direct answer to 'why'.\n2) Supporting reasoning (2-3 points).\n3) One example or analogy.",
+            "design":    "1) Direct high-level answer.\n2) Key components/trade-offs (bullets).\n3) One concrete example or diagram description.",
+            "interview": "1) Direct, interview-ready answer.\n2) Key points an interviewer expects (bullets).\n3) One follow-up question to anticipate.",
+            "research":  "1) Direct summary of current understanding.\n2) Key findings/approaches (bullets).\n3) One open question or limitation.",
+            "explain":   "1) Direct answer to the question first.\n2) Core concept breakdown (bullets).\n3) One real-world example.\n4) One practice question.",
+        }
+        structure = _STRUCTURES.get(intent, _STRUCTURES["explain"])
 
-### **Technical/Mathematical Detail**
-*Formula, principle, or technical fact with brief explanation*
+        _DEPTH_INSTRUCTIONS = {
+            "beginner":     "Use simple vocabulary, avoid jargon, keep math minimal, use everyday analogies.",
+            "intermediate": "Use standard academic vocabulary, include relevant formulas/terms, moderate depth.",
+            "advanced":     "Use precise technical/academic vocabulary, include rigorous detail and notation where relevant.",
+        }
+        depth_instruction = _DEPTH_INSTRUCTIONS[depth]
 
-### **Real-World Analogy**
-*A clear, relatable analogy that simplifies the abstract concept*
-
-### **Worked Example or Application**
-*Concrete example showing how the concept is applied*
-
-### **Quick Check Quiz**
-**Question:** [MCQ testing understanding of the main concept]
-- A) [Distractor]
-- B) [Correct answer]
-- C) [Distractor]
-- D) [Distractor]
-
-### **Common Misconceptions**
-* *Misconception*: What students often get wrong.
-* *Correction*: The accurate explanation.
-"""
         system_prompt = f"""You are 'Clarix', a strict, expert academic study assistant. {selected_instruction}
 
-{template_instruction}
+**ANSWER THE DIRECT QUESTION FIRST**, then expand using this structure for a "{intent}" request:
+{structure}
+
+**Audience depth: {depth}.** {depth_instruction}
 
 **ABSOLUTE RULE — NON-NEGOTIABLE**: You ONLY answer academic and study-related questions.
 If a message is not about an academic subject, you MUST refuse and say:
 "{NON_ACADEMIC_REPLY}"
 
-**Quality Standards for Responses:**
-- Provide EXACT, CLEAN, DETAILED explanations with no misleading information.
-- Be precise in definitions and technical content.
-- Ensure all examples and analogies accurately represent the concept.
-- Use proper academic terminology consistently.
-- Organize information logically and hierarchically.
-
-**Context Use**: Use the provided context if relevant. If context is insufficient, use your reliable knowledge.
+Be precise and factually accurate. Keep the response focused — no filler or repeated framing.
 
 Context:
 {context[:1500]}
 """
     else:
+        intent       = detect_intent(user_query)
+        depth        = detect_depth(user_query, stored_level)
+        depth_instruction = {
+            "beginner":     "Use simple vocabulary, minimal jargon, minimal math.",
+            "intermediate": "Use standard academic vocabulary and moderate technical depth.",
+            "advanced":     "Use precise technical vocabulary and rigorous depth.",
+        }[depth]
+
         system_prompt = f"""You are 'Clarix', a strict, expert academic study assistant. {selected_instruction}
 
-**Quality Standards for All Responses:**
-- Provide EXACT, CLEAN, DETAILED explanations without misleading information.
-- Be precise in technical content and definitions.
-- Ensure all claims are academically sound and factually correct.
-- Organize responses logically with clear structure.
-- Use proper academic terminology and conventions.
-- Provide examples, context, and deeper insight when relevant.
+**Answer the user's direct question first**, then add only the context needed to fully address it. Be precise, factually accurate, and avoid generic filler.
+
+**Audience depth: {depth}.** {depth_instruction}
 
 **ABSOLUTE RULE — NON-NEGOTIABLE**: You ONLY answer academic and study-related questions.
 If a message is not about an academic subject, you MUST refuse and say:
 "{NON_ACADEMIC_REPLY}"
 
-**Context Use**: Use the provided context if available and relevant. Otherwise, use your knowledge.
+**MULTI-QUESTION RULE**: If asked more than 8 questions at once, answer the first 6 fully, then say: "Type 'continue' for the remaining questions."
+**CONTINUE RULE**: If the user sends "continue", resume exactly where the previous response ended — no restart, no repeat, no preamble.
 
-**MULTI-QUESTION RULE**: If the user asks more than 8 questions at once, answer the first 6 fully, then end with: "Type 'continue' for the remaining questions."
-**CONTINUE RULE**: If the user sends "continue" or "continue answer", look at the conversation history and resume EXACTLY where the previous response ended — do not restart, do not repeat, do not add a preamble. Start mid-sentence or at the next question number if that is where it stopped.
 Context:
 {context[:1500]}
 """
@@ -393,12 +417,17 @@ async def chat_endpoint(
         # Save user message to DB in background
         background_tasks.add_task(save_message, user_id, session_id, "user", message, mode)
 
+        from backend.services.memory_service import get_profile
+        profile = await asyncio.to_thread(get_profile, user_id)
+        stored_level = "advanced" if "Engineering" in (profile.get("subject_focus") or []) or "Computer Science" in (profile.get("subject_focus") or []) else None
+
         gen = get_ai_response(
             user_query=message,
             history=history_list,
             mode=mode,
             context=combined_context,
             trigger_scholarly_template=trigger_template,
+            stored_level=stored_level,
         )
 
         # Wrap generator to also save AI response to DB

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { X, Pencil, Flame, Star, Lock, Check, ChevronRight, Zap, Trophy } from 'lucide-react';
+import { X, Pencil, Flame, Star, Lock, Check, ChevronRight, Zap, Trophy, Eye, EyeOff, Shield, AlertTriangle, Trash2, LogOut } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -19,13 +19,25 @@ const AVATARS = [
   { emoji: '🌟', level: 50, label: 'Legend'    },
 ];
 
-export default function ProfilePanel({ userId, profileData: initialProfileData, onProfileUpdate, xpData, streakData, onClose }) {
+export default function ProfilePanel({ userId, profileData: initialProfileData, onProfileUpdate, xpData, streakData, onClose, onLogout }) {
   const [profile, setProfile] = useState(initialProfileData || null);
   const [editing, setEditing] = useState(false);
   const [name, setName]       = useState('');
   const [bio, setBio]         = useState('');
   const [avatar, setAvatar]   = useState('🎓');
   const [saving, setSaving]   = useState(false);
+  const [tab, setTab]         = useState('profile'); // 'profile' | 'security'
+  const [showPwModal, setShowPwModal]       = useState(false);
+  const [pwCurrent, setPwCurrent]           = useState('');
+  const [pwNew, setPwNew]                   = useState('');
+  const [showPwCurrent, setShowPwCurrent]   = useState(false);
+  const [showPwNew, setShowPwNew]           = useState(false);
+  const [pwMsg, setPwMsg]                   = useState(null);
+  const [pwSaving, setPwSaving]             = useState(false);
+  const [confirmLogout, setConfirmLogout]   = useState(false);
+  const [confirmDelete, setConfirmDelete]   = useState(false);
+  const [deleteText, setDeleteText]         = useState('');
+  const [deleting, setDeleting]             = useState(false);
 
   const userLevel = xpData?.level || 1;
   const levelPct  = xpData ? Math.round(((xpData.total % 500) / 500) * 100) : 0;
@@ -54,18 +66,57 @@ export default function ProfilePanel({ userId, profileData: initialProfileData, 
     setSaving(true);
     const fd = new FormData();
     fd.append('name', name); fd.append('bio', bio); fd.append('avatar', avatar);
-    const r = await apiFetch(`${API_URL}/profile/${userId}`, { method: 'POST', body: fd });
-    const d = await r.json();
-    const updated = d.user ?? d;
-    setProfile(updated);
-    if (onProfileUpdate) onProfileUpdate(updated);
-    setSaving(false);
-    setEditing(false);
+    try {
+      const r = await apiFetch(`${API_URL}/profile/${userId}`, { method: 'POST', body: fd });
+      const d = await r.json();
+      const updated = { ...profile, ...(d.user ?? d) };
+      setProfile(updated);
+      setName(updated.name ?? '');
+      setBio(updated.bio ?? '');
+      setAvatar(updated.avatar ?? '🎓');
+      if (onProfileUpdate) onProfileUpdate(updated);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const cancelEdit = () => {
     setName(profile?.name ?? ''); setBio(profile?.bio ?? ''); setAvatar(profile?.avatar ?? '🎓');
     setEditing(false);
+  };
+
+  const changePassword = async () => {
+    setPwMsg(null);
+    if (pwNew.length < 8) { setPwMsg({ ok: false, text: 'New password must be at least 8 characters.' }); return; }
+    setPwSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append('current_password', pwCurrent);
+      fd.append('new_password', pwNew);
+      const r = await apiFetch(`${API_URL}/auth/change-password`, { method: 'POST', body: fd });
+      const d = await r.json();
+      if (!r.ok) { setPwMsg({ ok: false, text: d.detail || 'Failed.' }); return; }
+      setPwMsg({ ok: true, text: 'Password updated.' });
+      setPwCurrent(''); setPwNew('');
+      setTimeout(() => { setShowPwModal(false); setPwMsg(null); }, 1200);
+    } catch {
+      setPwMsg({ ok: false, text: 'Request failed.' });
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (deleteText !== 'DELETE') return;
+    setDeleting(true);
+    try {
+      await apiFetch(`${API_URL}/profile/${userId}/delete-account`, { method: 'DELETE' });
+      localStorage.clear();
+      window.location.href = '/login';
+    } catch {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -113,12 +164,20 @@ export default function ProfilePanel({ userId, profileData: initialProfileData, 
             <div className="mt-4">
               <h2 className="text-xl font-bold text-white tracking-tight">{profile?.name || 'Scholar'}</h2>
               <p className="text-xs text-zinc-500 mt-1.5 min-h-[1rem] leading-relaxed">{profile?.bio || 'No bio yet — tell the world about yourself'}</p>
-              <button
-                onClick={() => setEditing(true)}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-violet-400 hover:text-violet-300 transition-colors bg-violet-500/10 hover:bg-violet-500/15 px-3 py-1.5 rounded-full"
-              >
-                <Pencil size={11} /> Edit Profile
-              </button>
+              <div className="flex items-center justify-center gap-1.5 mt-3">
+                <button
+                  onClick={() => setEditing(true)}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-violet-400 hover:text-violet-300 transition-colors bg-violet-500/10 hover:bg-violet-500/15 px-3 py-1.5 rounded-full"
+                >
+                  <Pencil size={11} /> Edit Profile
+                </button>
+                <button
+                  onClick={() => { setTab('security'); }}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-400 hover:text-zinc-300 transition-colors bg-white/5 hover:bg-white/8 px-3 py-1.5 rounded-full"
+                >
+                  <Shield size={11} /> Security
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-3 mt-4">
@@ -189,8 +248,15 @@ export default function ProfilePanel({ userId, profileData: initialProfileData, 
           )}
         </div>
 
-        {/* ── STATS ── */}
         {!editing && (
+          <div className="flex gap-1 px-4 mb-2">
+            <button onClick={() => setTab('profile')} className={`flex-1 text-xs font-bold py-2 rounded-xl transition-all ${tab === 'profile' ? 'bg-violet-600/20 text-violet-300' : 'text-zinc-500 hover:text-zinc-300'}`}>Profile</button>
+            <button onClick={() => setTab('security')} className={`flex-1 text-xs font-bold py-2 rounded-xl transition-all ${tab === 'security' ? 'bg-violet-600/20 text-violet-300' : 'text-zinc-500 hover:text-zinc-300'}`}>Security</button>
+          </div>
+        )}
+
+        {/* ── STATS ── */}
+        {!editing && tab === 'profile' && (
           <div className="px-4 pb-3">
             {/* Thin separator */}
             <div className="h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent mb-4" />
@@ -297,6 +363,59 @@ export default function ProfilePanel({ userId, profileData: initialProfileData, 
           </div>
         )}
 
+        {!editing && tab === 'security' && (
+          <div className="px-4 pb-3 space-y-3">
+            <div className="h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent mb-1" />
+
+            <button
+              onClick={() => setShowPwModal(true)}
+              className="w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-all hover:bg-white/[0.05]"
+              style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(139,92,246,0.12)' }}>
+                <Lock size={16} className="text-violet-400" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-semibold text-zinc-200">Change Password</p>
+                <p className="text-[11px] text-zinc-500 mt-0.5">Update your account password</p>
+              </div>
+              <ChevronRight size={14} className="text-zinc-600" />
+            </button>
+
+            <button
+              onClick={() => setConfirmLogout(true)}
+              className="w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-all hover:bg-white/[0.05]"
+              style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(96,165,250,0.12)' }}>
+                <LogOut size={16} className="text-blue-400" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-semibold text-zinc-200">Log Out</p>
+                <p className="text-[11px] text-zinc-500 mt-0.5">Sign out of this device</p>
+              </div>
+              <ChevronRight size={14} className="text-zinc-600" />
+            </button>
+
+            <div className="pt-2">
+              <p className="text-[9px] font-bold text-red-500/70 uppercase tracking-widest mb-2 px-1">Danger Zone</p>
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-all hover:bg-red-500/10"
+                style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}
+              >
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(239,68,68,0.15)' }}>
+                  <Trash2 size={16} className="text-red-400" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-semibold text-red-400">Delete Account</p>
+                  <p className="text-[11px] text-red-500/60 mt-0.5">Permanently erase all your data</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── Footer ── */}
         <div className="px-4 pb-5 pt-1 text-center">
           <p className="text-[10px] text-zinc-700">
@@ -305,6 +424,89 @@ export default function ProfilePanel({ userId, profileData: initialProfileData, 
               : '—'}
           </p>
         </div>
+
+        {/* Change Password Modal */}
+        {showPwModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowPwModal(false)}>
+            <div className="bg-[#16161a] border border-white/10 rounded-2xl p-6 w-[320px] space-y-3" onClick={e => e.stopPropagation()}>
+              <h3 className="text-sm font-bold text-white">Change Password</h3>
+              <div className="relative">
+                <input type={showPwCurrent ? 'text' : 'password'} placeholder="Current password" value={pwCurrent}
+                  onChange={e => setPwCurrent(e.target.value)}
+                  className="w-full px-3 py-2.5 pr-9 rounded-xl text-sm bg-white/5 border border-white/10 text-zinc-200 outline-none focus:border-violet-500/50" />
+                <button onClick={() => setShowPwCurrent(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300">
+                  {showPwCurrent ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              <div className="relative">
+                <input type={showPwNew ? 'text' : 'password'} placeholder="New password (min 8 chars)" value={pwNew}
+                  onChange={e => setPwNew(e.target.value)}
+                  className="w-full px-3 py-2.5 pr-9 rounded-xl text-sm bg-white/5 border border-white/10 text-zinc-200 outline-none focus:border-violet-500/50" />
+                <button onClick={() => setShowPwNew(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300">
+                  {showPwNew ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              {pwMsg && <p className={`text-xs font-semibold ${pwMsg.ok ? 'text-green-500' : 'text-red-400'}`}>{pwMsg.text}</p>}
+              <div className="flex gap-2 pt-1">
+                <button onClick={changePassword} disabled={pwSaving || !pwCurrent || !pwNew}
+                  className="flex-1 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-all disabled:opacity-50">
+                  {pwSaving ? 'Updating…' : 'Update Password'}
+                </button>
+                <button onClick={() => { setShowPwModal(false); setPwCurrent(''); setPwNew(''); setPwMsg(null); }}
+                  className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 text-xs font-bold transition-all">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Logout confirmation */}
+        {confirmLogout && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setConfirmLogout(false)}>
+            <div className="bg-[#16161a] border border-white/10 rounded-2xl p-6 w-[300px] text-center space-y-3" onClick={e => e.stopPropagation()}>
+              <LogOut size={28} className="text-blue-400 mx-auto" />
+              <p className="text-sm font-bold text-white">Log out of Clarix?</p>
+              <p className="text-xs text-zinc-500">You'll need to sign in again to continue.</p>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => { setConfirmLogout(false); onLogout && onLogout(); }}
+                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all">
+                  Log Out
+                </button>
+                <button onClick={() => setConfirmLogout(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 text-xs font-bold transition-all">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete account confirmation */}
+        {confirmDelete && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => { setConfirmDelete(false); setDeleteText(''); }}>
+            <div className="bg-[#16161a] border border-red-500/20 rounded-2xl p-6 w-[320px] text-center space-y-3" onClick={e => e.stopPropagation()}>
+              <AlertTriangle size={28} className="text-red-400 mx-auto" />
+              <p className="text-sm font-bold text-white">Delete your account?</p>
+              <p className="text-xs text-zinc-500">This permanently erases all your data — XP, streaks, chats, and weaknesses. This cannot be undone.</p>
+              <input
+                value={deleteText} onChange={e => setDeleteText(e.target.value)}
+                placeholder="Type DELETE to confirm"
+                className="w-full px-3 py-2.5 rounded-xl text-sm bg-white/5 border border-red-500/20 text-zinc-200 outline-none focus:border-red-500/50 text-center"
+              />
+              <div className="flex gap-2 pt-1">
+                <button onClick={deleteAccount} disabled={deleteText !== 'DELETE' || deleting}
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-all disabled:opacity-40">
+                  {deleting ? 'Deleting…' : 'Delete Forever'}
+                </button>
+                <button onClick={() => { setConfirmDelete(false); setDeleteText(''); }}
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 text-xs font-bold transition-all">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Shimmer keyframe */}
         <style>{`

@@ -43,7 +43,7 @@ export async function signupUser({ name, email, password }) {
   localStorage.setItem("scholarly_email",   data.email);
   localStorage.setItem("scholarly_name",    data.name);
   return data;
-  } // apply to both loginUser and signupUser
+}
 
 export async function loginUser({ email, password }) {
   const fd = new FormData();
@@ -57,6 +57,7 @@ export async function loginUser({ email, password }) {
     throw new Error(err.detail || "Login failed");
   }
   const data = await res.json();
+  localStorage.setItem("scholarly_token",   data.token);
   localStorage.setItem("scholarly_user_id", data.user_id);
   localStorage.setItem("scholarly_email",   data.email);
   localStorage.setItem("scholarly_name",    data.name);

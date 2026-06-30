@@ -5,7 +5,7 @@ import { apiFetch } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-export default function KnowledgePanel() {
+export default function KnowledgePanel({ onQuickAction }) {
   const [docs, setDocs]           = useState([]);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting]   = useState(null);
@@ -107,16 +107,41 @@ export default function KnowledgePanel() {
           </div>
         ) : (
           docs.map(doc => (
-            <div key={doc} className="flex items-center gap-3 p-3 rounded-xl bg-zinc-50 dark:bg-white/3 border border-zinc-100 dark:border-white/6 group">
-              <FileText size={15} className="text-violet-400 shrink-0" />
-              <span className="flex-1 text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">{doc}</span>
-              <button
-                onClick={() => remove(doc)}
-                disabled={deleting === doc}
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-red-400"
-              >
-                {deleting === doc ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-              </button>
+            <div key={doc} className="rounded-xl bg-zinc-50 dark:bg-white/3 border border-zinc-100 dark:border-white/6 overflow-hidden group">
+              <div className="flex items-center gap-3 p-3">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
+                  <FileText size={14} className="text-violet-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate">{doc}</p>
+                  <p className="text-[10px] text-green-500 mt-0.5">● Indexed & ready</p>
+                </div>
+                <button
+                  onClick={() => remove(doc)}
+                  disabled={deleting === doc}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-red-400 shrink-0"
+                >
+                  {deleting === doc ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                </button>
+              </div>
+              {onQuickAction && (
+                <div className="flex gap-1.5 px-3 pb-2.5 flex-wrap">
+                  {[
+                    { label: 'Summarize',     prompt: `Summarize the key points from "${doc}".` },
+                    { label: 'Generate Quiz', prompt: `Generate a quiz based on "${doc}".`, isQuiz: true },
+                    { label: 'Explain',       prompt: `Explain the difficult concepts in "${doc}" simply.` },
+                    { label: 'Create Notes',  prompt: `Create concise revision notes from "${doc}".` },
+                  ].map(({ label, prompt, isQuiz }) => (
+                    <button
+                      key={label}
+                      onClick={() => onQuickAction({ prompt, isQuiz })}
+                      className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-violet-500/10 text-violet-500 hover:bg-violet-500/20 transition-all"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ))
         )}

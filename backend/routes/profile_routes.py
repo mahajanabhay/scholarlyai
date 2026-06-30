@@ -190,6 +190,23 @@ async def touch_streak_endpoint(
     return result
 
 
+@router.post("/streak/{user_id}/use-freeze")
+async def use_freeze_endpoint(user_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Manually consume a streak freeze after the user confirms via the UI.
+    Only allowed when a freeze is actually available and the streak is at risk
+    (i.e. not active today) — prevents accidental/early consumption.
+    """
+    if user_id != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access forbidden.")
+
+    from backend.services.memory_service import use_streak_freeze
+    result = await asyncio.to_thread(use_streak_freeze, user_id)
+    if result is None:
+        raise HTTPException(status_code=400, detail="No freeze available or streak is not at risk.")
+    return result
+
+
 # ── XP / Level System ─────────────────────────
 @router.get("/xp/{user_id}")
 async def get_xp_endpoint(user_id: str, current_user: dict = Depends(get_current_user)):
@@ -837,6 +854,20 @@ async def change_password(
         from backend.services.audit_service import audit
         audit(current_user["user_id"], "password_changed", "via settings")
         return {"status": "password updated"}
+    finally:
+        release_connection(conn)
+
+@router.delete("/profile/{user_id}/delete-account")
+async def delete_account_endpoint(user_id: str, current_user: dict = Depends(get_current_user)):
+    if user_id != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Access forbidden.")
+    from backend.db import get_connection, release_connection
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
+        conn.commit()
+        return {"status": "deleted"}
     finally:
         release_connection(conn)
 
