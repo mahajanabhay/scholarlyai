@@ -22,7 +22,7 @@ DB_PASSWORD      = _require("DB_PASSWORD")
 # Optional with defaults
 ALLOWED_ORIGINS      = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 MAX_HISTORY          = int(os.getenv("MAX_HISTORY_LENGTH", 6))
-MAX_TOKENS           = int(os.getenv("MAX_TOKENS_OUTPUT", 30000))
+MAX_TOKENS           = int(os.getenv("MAX_TOKENS_OUTPUT", 3000))
 CHROMA_BASE_DIR      = os.getenv("CHROMA_BASE_DIR", "./chroma_db")
 EMBED_MODEL          = "sentence-transformers/all-MiniLM-L6-v2"
 LLM_MODEL            = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
