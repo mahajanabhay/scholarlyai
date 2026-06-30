@@ -146,6 +146,32 @@ export default function Dashboard() {
     if (savedRecent)    setRecentChats(parsedRecent);
     if (savedBookmarks) setBookmarkedIds(JSON.parse(savedBookmarks));
 
+    // Fetch authoritative session list from backend
+apiFetch(`${API_URL}/chat/sessions`).then(r => r.json()).then(async (d) => {
+  const backendSessions = d.sessions || [];
+  if (backendSessions.length === 0) return;
+
+  setRecentChats(backendSessions);
+
+  // Load history for each session in parallel
+  const histories = await Promise.all(
+    backendSessions.map(s =>
+      apiFetch(`${API_URL}/chat/history/${s.session_id || s}`)
+        .then(r => r.json())
+        .then(h => [s.session_id || s, h.history || []])
+        .catch(() => [s.session_id || s, []])
+    )
+  );
+
+  setSessions(prev => {
+    const merged = { ...prev };
+    for (const [sid, msgs] of histories) {
+      if (msgs.length > 0) merged[sid] = msgs;
+    }
+    return merged;
+  });
+}).catch(e => console.error('[chat/sessions]', e));
+
     if (savedTheme !== null) {
       setIsDarkMode(savedTheme === 'dark');
     } else {
