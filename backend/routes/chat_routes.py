@@ -144,7 +144,7 @@ def get_ai_response(user_query: str, history: list, mode: str, context: str, tri
 - Never provide misleading, incorrect, or incomplete code.
 
 **Context from uploaded files (use if relevant):**
-{context[:3000]}
+{context[:1500]}
 """
     elif trigger_scholarly_template:
         template_instruction = """
@@ -194,7 +194,7 @@ If a message is not about an academic subject, you MUST refuse and say:
 **Context Use**: Use the provided context if relevant. If context is insufficient, use your reliable knowledge.
 
 Context:
-{context[:3000]}
+{context[:1500]}
 """
     else:
         system_prompt = f"""You are 'Clarix', a strict, expert academic study assistant. {selected_instruction}
@@ -216,12 +216,13 @@ If a message is not about an academic subject, you MUST refuse and say:
 **MULTI-QUESTION RULE**: If the user asks more than 8 questions at once, answer the first 6 fully, then end with: "Type 'continue' for the remaining questions."
 **CONTINUE RULE**: If the user sends "continue" or "continue answer", look at the conversation history and resume EXACTLY where the previous response ended — do not restart, do not repeat, do not add a preamble. Start mid-sentence or at the next question number if that is where it stopped.
 Context:
-{context[:3000]}
+{context[:1500]}
 """
 
     messages = [{"role": "system", "content": system_prompt}]
     for msg in history[-MAX_HISTORY:]:
-        messages.append({"role": msg.get("role"), "content": msg.get("content")})
+        content = (msg.get("content") or "")[:1500]
+        messages.append({"role": msg.get("role"), "content": content})
     messages.append({"role": "user", "content": user_query})
 
     async def generate():
@@ -381,7 +382,7 @@ async def chat_endpoint(
 
         db   = get_vector_db(f"user_{user_id}")
         docs = await asyncio.to_thread(db.similarity_search, message, k=3)
-        db_context = "\n".join([doc.page_content for doc in docs])
+        db_context = "\n".join([doc.page_content for doc in docs])[:1500]
 
         combined_context = ""
         if context_from_files:
