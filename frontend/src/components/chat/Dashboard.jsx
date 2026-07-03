@@ -1448,6 +1448,9 @@ apiFetch(`${API_URL}/chat/sessions`).then(r => r.json()).then(async (d) => {
           onProfileUpdate={(d) => {
             setProfileData(d);
             localStorage.setItem(`scholarly_profile_${userId}`, JSON.stringify(d));
+            // Keep convenience keys in sync so sidebar name/avatar
+            // update immediately and survive hard refresh
+            if (d.name) localStorage.setItem('scholarly_name', d.name);
           }}
           xpData={xpData}
           streakData={streakData}

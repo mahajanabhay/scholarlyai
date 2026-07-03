@@ -128,10 +128,11 @@ async def update_profile_endpoint(
     finally:
         release_connection(conn)
 
-    return await asyncio.to_thread(
-        get_profile,
-        user_id
-    )
+    # Invalidate Redis cache so next fetch returns fresh data
+    from backend.core.cache import delete as cache_delete
+    cache_delete(f"profile:{user_id}")
+
+    return await asyncio.to_thread(get_profile, user_id)
 
 
 # ── Weakness Tracking ─────────────────────────

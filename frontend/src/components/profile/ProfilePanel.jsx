@@ -64,18 +64,29 @@ export default function ProfilePanel({ userId, profileData: initialProfileData, 
 
   const save = async () => {
     setSaving(true);
+    // Optimistic update — apply locally immediately so UI reflects changes
+    // without waiting for backend round-trip or cache invalidation.
+    const optimistic = { ...profile, name, bio, avatar };
+    setProfile(optimistic);
+    if (onProfileUpdate) onProfileUpdate(optimistic);
+    setEditing(false);
+
     const fd = new FormData();
     fd.append('name', name); fd.append('bio', bio); fd.append('avatar', avatar);
     try {
       const r = await apiFetch(`${API_URL}/profile/${userId}`, { method: 'POST', body: fd });
       const d = await r.json();
-      const updated = { ...profile, ...(d.user ?? d) };
-      setProfile(updated);
-      setName(updated.name ?? '');
-      setBio(updated.bio ?? '');
-      setAvatar(updated.avatar ?? '🎓');
-      if (onProfileUpdate) onProfileUpdate(updated);
-      setEditing(false);
+      // Reconcile with server truth — backend is authoritative
+      const confirmed = { ...optimistic, ...(d.user ?? d) };
+      setProfile(confirmed);
+      setName(confirmed.name ?? '');
+      setBio(confirmed.bio ?? '');
+      setAvatar(confirmed.avatar ?? '🎓');
+      if (onProfileUpdate) onProfileUpdate(confirmed);
+    } catch {
+      // On failure roll back to pre-edit state
+      setProfile(profile);
+      if (onProfileUpdate) onProfileUpdate(profile);
     } finally {
       setSaving(false);
     }
