@@ -469,27 +469,9 @@ async def chat_endpoint(
 async def get_chat_history(
     session_id: str,
     limit: int = 100,
-    offset: int = 0,
     current_user: dict = Depends(get_current_user)
 ):
-    from backend.db import get_connection, release_connection
-
-    def _fetch():
-        conn = get_connection()
-        try:
-            cur = conn.cursor()
-            cur.execute(
-                """SELECT role, content, mode FROM chat_sessions
-                WHERE user_id = %s AND session_id = %s
-                ORDER BY created_at ASC
-                LIMIT %s OFFSET %s""",
-                (current_user["user_id"], session_id, limit, offset)
-            )
-            return cur.fetchall()
-        finally:
-            release_connection(conn)
-    rows = await asyncio.to_thread(_fetch)
-    history = [{"role": r[0], "content": r[1], "mode": r[2]} for r in rows]
+    history = await asyncio.to_thread(load_history, current_user["user_id"], session_id, limit)
     return {"history": history}
 
 

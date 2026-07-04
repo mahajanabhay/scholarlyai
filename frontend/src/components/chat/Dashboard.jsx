@@ -124,6 +124,29 @@ export default function Dashboard() {
   const chatEndRef         = useRef(null);
   const abortControllerRef = useRef(null);
 
+  // Fetch one session's real messages from Postgres. Never falls back to
+  // localStorage for message content — Postgres is the only source of truth.
+  const loadSessionHistory = async (sessionId) => {
+    if (!sessionId) return;
+    try {
+      const res = await apiFetch(`${API_URL}/chat/history/${sessionId}`);
+      const data = await res.json();
+      setSessions(prev => ({ ...prev, [sessionId]: data.history || [] }));
+    } catch (e) {
+      console.error('[chat/history]', e);
+    }
+  };
+
+  // Open a chat: switch the active session, fetch its content from the
+  // backend if we don't already have it cached in memory for this page load.
+  const openSession = async (sessionId, sessionMode) => {
+    setCurrentSessionId(sessionId);
+    if (sessionMode) setMode(sessionMode);
+    if (!sessions[sessionId]) {
+      await loadSessionHistory(sessionId);
+    }
+  };
+
   // ── Hydration ──────────────────────────────
   useEffect(() => {
     const uid   = localStorage.getItem("scholarly_user_id");
@@ -136,44 +159,12 @@ export default function Dashboard() {
 
     setUserId(uid);
 
-    const savedSessions  = localStorage.getItem(`scholarly_sessions_${uid}`);
-    const savedRecent    = localStorage.getItem(`scholarly_recent_chats_${uid}`);
+    // UI-only preferences — never chat content
     const savedBookmarks = localStorage.getItem(`scholarly_bookmarks_${uid}`);
     const savedTheme     = localStorage.getItem(`scholarly_theme_${uid}`);
-    const savedSessionId = localStorage.getItem(`scholarly_current_session_${uid}`);
+    const lastOpenedId   = localStorage.getItem(`scholarly_last_opened_chat_${uid}`);
 
-    const parsedSessions = savedSessions ? JSON.parse(savedSessions) : {};
-    const parsedRecent   = savedRecent   ? JSON.parse(savedRecent)   : [];
-
-    if (savedSessions)  setSessions(parsedSessions);
-    if (savedRecent)    setRecentChats(parsedRecent);
     if (savedBookmarks) setBookmarkedIds(JSON.parse(savedBookmarks));
-
-    // Fetch authoritative session list from backend
-apiFetch(`${API_URL}/chat/sessions`).then(r => r.json()).then(async (d) => {
-  const backendSessions = d.sessions || [];
-  if (backendSessions.length === 0) return;
-
-  setRecentChats(backendSessions);
-
-  // Load history for each session in parallel
-  const histories = await Promise.all(
-    backendSessions.map(s =>
-      apiFetch(`${API_URL}/chat/history/${s.session_id || s}`)
-        .then(r => r.json())
-        .then(h => [s.session_id || s, h.history || []])
-        .catch(() => [s.session_id || s, []])
-    )
-  );
-
-  setSessions(prev => {
-    const merged = { ...prev };
-    for (const [sid, msgs] of histories) {
-      if (msgs.length > 0) merged[sid] = msgs;
-    }
-    return merged;
-  });
-}).catch(e => console.error('[chat/sessions]', e));
 
     if (savedTheme !== null) {
       setIsDarkMode(savedTheme === 'dark');
@@ -182,12 +173,27 @@ apiFetch(`${API_URL}/chat/sessions`).then(r => r.json()).then(async (d) => {
       setIsDarkMode(prefersDark);
     }
 
-    // Restore last active session
-    if (savedSessionId && parsedSessions[savedSessionId]?.length > 0) {
-      setCurrentSessionId(savedSessionId);
-    } else {
+    // Postgres is the single source of truth for sessions and messages.
+    // Fetch the session list, then lazily fetch content only for the one
+    // chat we're about to open — not every session on every page load.
+    apiFetch(`${API_URL}/chat/sessions`).then(r => r.json()).then(async (d) => {
+      const backendSessions = (d.sessions || []).map(s => ({
+        id: s.session_id,
+        title: s.preview,
+        mode: s.mode,
+      }));
+      setRecentChats(backendSessions);
+
+      const toOpen = backendSessions.find(s => s.id === lastOpenedId) || backendSessions[0];
+      if (toOpen) {
+        await openSession(toOpen.id, toOpen.mode);
+      } else {
+        setCurrentSessionId(Date.now().toString());
+      }
+    }).catch(e => {
+      console.error('[chat/sessions]', e);
       setCurrentSessionId(Date.now().toString());
-    }
+    });
 
     setHasMounted(true);
 
@@ -256,36 +262,12 @@ apiFetch(`${API_URL}/chat/sessions`).then(r => r.json()).then(async (d) => {
     return () => { if (abortControllerRef.current) abortControllerRef.current.abort(); };
   }, []);
 
-  // Persist sessions + chats
-  useEffect(() => {
-    if (hasMounted) {
-      try {
-        localStorage.setItem(`scholarly_sessions_${userId}`,     JSON.stringify(sessions));
-        localStorage.setItem(`scholarly_recent_chats_${userId}`, JSON.stringify(recentChats));
-      } catch (e) {
-        if (e.name === 'QuotaExceededError') {
-          console.warn('[storage] localStorage quota exceeded — oldest session pruned');
-          // Prune oldest session to make room
-          const keys = Object.keys(sessions).sort();
-          if (keys.length > 1) {
-            const pruned = { ...sessions };
-            delete pruned[keys[0]];
-            try {
-              localStorage.setItem(`scholarly_sessions_${userId}`, JSON.stringify(pruned));
-            } catch (_) {}
-          }
-        }
-      }
-    }
-  }, [sessions, recentChats, hasMounted]);
-
-  // Persist current session ID
+  // sessions/recentChats are an in-memory cache of what's in Postgres —
+  // never persisted to localStorage. Only a pointer to "which chat was
+  // last open" is kept, purely so a returning visit can jump back to it.
   useEffect(() => {
     if (hasMounted && currentSessionId) {
-      localStorage.setItem(`scholarly_current_session_${userId}`, currentSessionId);
-      // Also save as last session for the empty state "Continue" button
-      localStorage.setItem(`last_session_id_${userId}`, currentSessionId);
-      localStorage.setItem(`last_session_date_${userId}`, new Date().toLocaleString());
+      localStorage.setItem(`scholarly_last_opened_chat_${userId}`, currentSessionId);
     }
   }, [currentSessionId, hasMounted]);
 
@@ -341,16 +323,15 @@ apiFetch(`${API_URL}/chat/sessions`).then(r => r.json()).then(async (d) => {
   );
 
   // ── Switch mode: resume last session of that mode, or open a fresh one ──
-  const switchMode = (newMode) => {
+  const switchMode = async (newMode) => {
     setIsModeMenuOpen(false);
     if (newMode === mode) return; // already in this mode, do nothing
     if (newMode !== "QUIZ") exitQuiz();
 
     // Find the most recent chat that belongs to newMode
     const existing = recentChats.find(c => c.mode === newMode);
-    if (existing && sessions[existing.id]?.length > 0) {
-      // Resume that session
-      setCurrentSessionId(existing.id);
+    if (existing) {
+      await openSession(existing.id, newMode);
     } else {
       // No prior session for this mode — open a blank one
       setCurrentSessionId(Date.now().toString());
@@ -853,7 +834,7 @@ apiFetch(`${API_URL}/chat/sessions`).then(r => r.json()).then(async (d) => {
                     </div>
                   ) : (
                     <button
-                      onClick={() => { exitQuiz(); setCurrentSessionId(chat.id); if (chat.mode) setMode(chat.mode); }}
+                      onClick={() => { exitQuiz(); openSession(chat.id, chat.mode); }}
                       className={`w-full text-left px-3 py-2 rounded-xl transition-all text-sm truncate ${
                         currentSessionId === chat.id
                           ? 'bg-zinc-200 dark:bg-white/9 text-zinc-900 dark:text-white font-medium'
