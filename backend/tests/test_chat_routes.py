@@ -44,15 +44,14 @@ def test_chat_history_returns_messages():
     from backend.app import app
     from backend.core.jwt_auth import get_current_user
     from fastapi.testclient import TestClient
-    from unittest.mock import AsyncMock
 
-    fake_rows = [("user", "hi", "LEARN")]  # raw DB tuple shape
+    fake_history = [{"role": "user", "content": "hi", "mode": "LEARN", "created_at": "2026-01-01T00:00:00"}]
 
     app.dependency_overrides[get_current_user] = lambda: {"user_id": "test_user"}
-    with patch("backend.routes.chat_routes.asyncio.to_thread", new=AsyncMock(return_value=fake_rows)):
+    with patch("backend.routes.chat_routes.load_history", return_value=fake_history):
         with TestClient(app) as c:
             r = c.get("/chat/history/sess123")
     app.dependency_overrides.clear()
 
     assert r.status_code == 200
-    assert r.json() == {"history": [{"role": "user", "content": "hi", "mode": "LEARN"}]}
+    assert r.json() == {"history": fake_history}
