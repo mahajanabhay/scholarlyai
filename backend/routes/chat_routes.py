@@ -489,6 +489,7 @@ async def get_chat_history(
         finally:
             release_connection(conn)
     rows = await asyncio.to_thread(_fetch)
+    return rows
 
 
 @router.get("/chat/sessions")

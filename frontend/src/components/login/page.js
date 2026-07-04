@@ -63,6 +63,7 @@ export default function LoginPage() {
       }
 
       if (data.user_id) {
+        localStorage.setItem('scholarly_token', data.token);
         localStorage.setItem('scholarly_user_id', data.user_id);
         localStorage.setItem('scholarly_email', email.toLowerCase().trim());
         localStorage.setItem('scholarly_name', data.name || '');

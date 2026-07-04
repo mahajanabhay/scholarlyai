@@ -104,6 +104,11 @@ app.include_router(study_routes.router)
 app.include_router(knowledge_routes.router)
 app.include_router(referral_routes.router)
 
+import time
+
+_health_cache = {"ts": 0, "groq": "error", "groq_error": None}
+_HEALTH_CACHE_TTL = 30  # seconds
+
 @app.get("/health")
 async def health_check():
     import asyncio
@@ -126,18 +131,26 @@ async def health_check():
     except Exception as e:
         status["db_error"] = str(e)
 
-    # Check Groq
-    try:
-        def _ping():
-            return client.chat.completions.create(
-                model=LLM_MODEL,
-                messages=[{"role": "user", "content": "ping"}],
-                max_tokens=1,
-                timeout=5.0,
-            )
-        await asyncio.wait_for(asyncio.to_thread(_ping), timeout=6.0)
-        status["groq"] = "ok"
-    except Exception as e:
-        status["groq_error"] = str(e)[:100]
+    # Check Groq (cached — avoid hammering Groq on every uptime-monitor hit)
+    now = time.time()
+    if now - _health_cache["ts"] < _HEALTH_CACHE_TTL:
+        status["groq"] = _health_cache["groq"]
+        if _health_cache["groq_error"]:
+            status["groq_error"] = _health_cache["groq_error"]
+    else:
+        try:
+            def _ping():
+                return client.chat.completions.create(
+                    model=LLM_MODEL,
+                    messages=[{"role": "user", "content": "ping"}],
+                    max_tokens=1,
+                    timeout=5.0,
+                )
+            await asyncio.wait_for(asyncio.to_thread(_ping), timeout=6.0)
+            status["groq"] = "ok"
+            _health_cache.update(ts=now, groq="ok", groq_error=None)
+        except Exception as e:
+            status["groq_error"] = str(e)[:100]
+            _health_cache.update(ts=now, groq="error", groq_error=status["groq_error"])
 
     return status
