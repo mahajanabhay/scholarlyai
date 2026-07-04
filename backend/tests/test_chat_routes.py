@@ -55,4 +55,4 @@ def test_chat_history_returns_messages():
     app.dependency_overrides.clear()
 
     assert r.status_code == 200
-    assert r.json() == fake_rows
+    assert r.json() == {"history": fake_rows}
