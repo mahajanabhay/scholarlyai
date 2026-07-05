@@ -407,7 +407,7 @@ export default function Dashboard() {
     try {
       const formData = new FormData();
       formData.append("message",         answer);
-      formData.append("session_id",      `${userId}_${currentId}`);
+      formData.append("session_id",      currentId);
       formData.append("mode",            mode);
       formData.append("quiz_type",       quizType);
       formData.append("question_number", questionNumber + 1);
@@ -469,7 +469,8 @@ export default function Dashboard() {
     setIsLoadingAnswers(prev => ({ ...prev, [msgId]: true }));
     try {
       const fd = new FormData();
-      fd.append('session_id', `${userId}_${currentSessionId}`);
+      // NEW
+      fd.append('session_id', currentSessionId);
       fd.append('paper_content', paperContent);
       const res = await apiFetch(`${API_URL}/quiz/answers`, { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`Answers error ${res.status}`);
@@ -540,7 +541,7 @@ export default function Dashboard() {
 
         const formData = new FormData();
         formData.append("message",         messageToSend);
-        formData.append("session_id",      `${userId}_${currentId}`);
+        formData.append("session_id",      currentId);
         formData.append("mode",            mode);
         formData.append("quiz_type",       "single");
         formData.append("question_number", 1);
@@ -563,7 +564,7 @@ export default function Dashboard() {
 
         const formData = new FormData();
         formData.append("message",         messageToSend);
-        formData.append("session_id",      `${userId}_${currentId}`);
+        formData.append("session_id",      currentId);
         formData.append("mode",            mode);
         formData.append("quiz_type",       "paper");
         formData.append("question_number", 1);
@@ -591,7 +592,7 @@ export default function Dashboard() {
 
         const formData = new FormData();
         formData.append("message",    messageToSend);
-        formData.append("session_id", `${userId}_${currentId}`);
+        formData.append("session_id", currentId);
         formData.append("mode",       mode);
         // Trim to last 20 — prevents context window overflow on long sessions
         formData.append("history",    JSON.stringify((sessions[currentId] || []).slice(-20)));
@@ -650,7 +651,7 @@ export default function Dashboard() {
                 });
                 const contForm = new FormData();
                 contForm.append("message", "continue from exactly where you left off, no preamble");
-                contForm.append("session_id", `${userId}_${currentId}`);
+                contForm.append("session_id", currentId);
                 contForm.append("mode", mode);
                 contForm.append("history", JSON.stringify([
                   ...(sessions[currentId] || []).slice(-20),
@@ -690,7 +691,7 @@ export default function Dashboard() {
           continueCount++;
           const contForm = new FormData();
           contForm.append("message", "continue from exactly where you left off, no preamble");
-          contForm.append("session_id", `${userId}_${currentId}`);
+          contForm.append("session_id", currentId);
           contForm.append("mode", mode);
           contForm.append("history", JSON.stringify([
             ...(sessions[currentId] || []).slice(-20),
@@ -724,7 +725,7 @@ export default function Dashboard() {
   const exitQuiz = async () => {
     try {
       const formData = new FormData();
-      formData.append("session_id", `${userId}_${currentSessionId}`);
+      formData.append("session_id", currentId);
       const response = await apiFetch(`${API_URL}/quiz/reset`, { method: "POST", body: formData });
     } catch (error) {
       console.error("Error resetting quiz:", error);
