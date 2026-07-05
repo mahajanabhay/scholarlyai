@@ -187,12 +187,24 @@ export default function Dashboard() {
       const toOpen = backendSessions.find(s => s.id === lastOpenedId) || backendSessions[0];
       if (toOpen) {
         await openSession(toOpen.id, toOpen.mode);
+      } else if (lastOpenedId) {
+        // Session list call succeeded but didn't (yet) include the chat we
+        // were in — e.g. a background save hadn't committed yet. Try to
+        // open it directly rather than assuming it doesn't exist.
+        await openSession(lastOpenedId);
       } else {
         setCurrentSessionId(Date.now().toString());
       }
-    }).catch(e => {
+    }).catch(async (e) => {
       console.error('[chat/sessions]', e);
-      setCurrentSessionId(Date.now().toString());
+      // The session LIST failed to load — likely a transient backend/DB
+      // hiccup, not proof the chat is gone. Never discard a known session
+      // pointer on a transient error; try to open it directly instead.
+      if (lastOpenedId) {
+        await openSession(lastOpenedId);
+      } else {
+        setCurrentSessionId(Date.now().toString());
+      }
     });
 
     setHasMounted(true);
