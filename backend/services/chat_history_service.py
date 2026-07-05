@@ -113,6 +113,7 @@ def get_user_sessions(user_id: str) -> list:
                   FROM chat_sessions cs2
                   WHERE cs2.user_id = cs1.user_id 
                     AND cs2.session_id = cs1.session_id
+                    AND cs2.role = 'user'
               )
             ORDER BY created_at DESC
         """, (user_id,))
