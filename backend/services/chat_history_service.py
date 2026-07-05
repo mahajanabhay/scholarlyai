@@ -24,7 +24,9 @@ def save_message(user_id: str, session_id: str, role: str, content: str, mode: s
             INSERT INTO chat_sessions (user_id, session_id, role, content, mode, created_at)
             VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
         """, (user_id, session_id, role, content, mode))
+        print(f"🔎 About to commit message for {user_id} to session {session_id}")
         conn.commit()
+        print(f"🔎 Commit finished for {user_id}")
     except Exception as e:
         if conn:
             conn.rollback()
