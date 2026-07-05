@@ -16,20 +16,22 @@ def save_message(user_id: str, session_id: str, role: str, content: str, mode: s
         content: Message content (can be multiline)
         mode: Learning mode (LEARN, QUIZ, SUMMARY, ANALYSIS, CODE)
     """
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO chat_sessions (user_id, session_id, role, content, mode, created_at)
             VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
         """, (user_id, session_id, role, content, mode))
         conn.commit()
-        pass
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         print(f"⚠️  Failed to save message for {user_id}: {e}")
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 
 def load_history(user_id: str, session_id: str, limit: int = 20) -> list:
@@ -47,8 +49,9 @@ def load_history(user_id: str, session_id: str, limit: int = 20) -> list:
     # ✅ FIX 2B: Enforce safety limits (prevent DoS via oversized requests)
     limit = min(max(limit, 1), 100)  # Clamp to 1-100 messages
     
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT role, content, mode, created_at
@@ -71,14 +74,14 @@ def load_history(user_id: str, session_id: str, limit: int = 20) -> list:
             for r in rows
         ]
         
-        pass
         return history
         
     except Exception as e:
         print(f"⚠️  Failed to load history for {user_id}:{session_id}: {e}")
         return []
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 
 def get_user_sessions(user_id: str) -> list:
@@ -94,8 +97,9 @@ def get_user_sessions(user_id: str) -> list:
     Returns:
         List of sessions with session_id, preview, mode, and created_at
     """
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         
         # ✅ FIX 2A: Use subquery instead of DISTINCT ON for portability
@@ -132,7 +136,8 @@ def get_user_sessions(user_id: str) -> list:
         print(f"⚠️  Failed to get sessions for {user_id}: {e}")
         return []
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 
 def delete_session(user_id: str, session_id: str) -> dict:
@@ -148,8 +153,9 @@ def delete_session(user_id: str, session_id: str) -> dict:
     Returns:
         {"status": "deleted"|"not_found"|"error", "deleted_messages": N, "message": error_str}
     """
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             DELETE FROM chat_sessions
@@ -169,7 +175,8 @@ def delete_session(user_id: str, session_id: str) -> dict:
         }
         
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         print(f"⚠️  Failed to delete session {user_id}:{session_id}: {e}")
         return {
             "status": "error",
@@ -177,7 +184,8 @@ def delete_session(user_id: str, session_id: str) -> dict:
             "deleted_messages": 0
         }
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 
 # ── OPTIONAL: Helper function for migration/analytics ──
@@ -186,8 +194,9 @@ def get_session_message_count(user_id: str, session_id: str) -> int:
     Get total message count for a session (for pagination info).
     Useful for frontend to know if there are more messages beyond the limit.
     """
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT COUNT(*) FROM chat_sessions
@@ -199,15 +208,17 @@ def get_session_message_count(user_id: str, session_id: str) -> int:
         print(f"⚠️  Failed to get message count: {e}")
         return 0
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 
 def get_user_message_stats(user_id: str) -> dict:
     """
     Get aggregate statistics for a user (for dashboard/insights).
     """
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT 
@@ -240,4 +251,5 @@ def get_user_message_stats(user_id: str) -> dict:
         print(f"⚠️  Failed to get user stats: {e}")
         return {}
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
