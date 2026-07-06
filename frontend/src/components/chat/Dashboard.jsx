@@ -815,12 +815,6 @@ export default function Dashboard() {
                   {searchQuery && <button onClick={() => setSearchQuery('')} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"><X size={12} /></button>}
                 </div>
               </div>
-              <button
-                onClick={() => { setShowSettings(true); setSettingsTab('study'); }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-white/[0.07] transition-all"
-              >
-                <span className="text-zinc-400 dark:text-zinc-500 flex items-center">···</span> More
-              </button>
             </div>
 
             {/* Divider */}
@@ -1082,13 +1076,13 @@ export default function Dashboard() {
                 <button onClick={exitQuiz} className="h-8 px-3 rounded-lg text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-white/[0.07] transition">Exit Quiz</button>
               )}
 
-              {/* ··· dots — opens settings */}
+              {/* Settings shortcut — only path to Settings when the sidebar is collapsed */}
               <button
                 onClick={() => { setShowSettings(true); setSettingsTab('general'); }}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/[0.07] transition"
                 title="Settings"
               >
-                <MoreHorizontal size={18} />
+                <Settings size={18} />
               </button>
             </div>
           </header>
@@ -1518,7 +1512,6 @@ export default function Dashboard() {
                 {[
                   { id: 'general',    icon: Settings,      label: 'General'          },
                   { id: 'stats',      icon: BarChart2,     label: 'Stats & Progress' },
-                  { id: 'study',      icon: BookOpen,      label: 'Study Tools'      },
                   { id: 'account',    icon: Shield,        label: 'Account'          },
                 ].map(({ id, icon: Icon, label }) => (
                   <button
@@ -1570,7 +1563,7 @@ export default function Dashboard() {
                     </button>
                   </div>
                   {/* Chat mode */}
-                  <div className="py-4">
+                  <div className="py-4 border-b border-zinc-100 dark:border-white/6">
                     <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 mb-1">Default Chat Mode</p>
                     <p className="text-xs text-zinc-500 dark:text-zinc-500 mb-3">Set your preferred learning mode</p>
                     <div className="grid grid-cols-3 gap-2">
@@ -1585,6 +1578,36 @@ export default function Dashboard() {
                           }`}
                         >{m}</button>
                       ))}
+                    </div>
+                  </div>
+                  {/* Subject Focus */}
+                  <div className="py-4">
+                    <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 mb-1">Subject Focus</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-500 mb-3">Personalises your AI plans and quizzes</p>
+                    <div className="flex flex-wrap gap-2">
+                      {SUBJECTS.map(s => {
+                        const selected = (profileData?.subject_focus || []).includes(s);
+                        return (
+                          <button
+                            key={s}
+                            onClick={async () => {
+                              const current = profileData?.subject_focus || [];
+                              const updated = selected ? current.filter(x => x !== s) : [...current, s];
+                              const fd = new FormData();
+                              fd.append('subject_focus', JSON.stringify(updated));
+                              const r = await apiFetch(`${API_URL}/profile/${userId}`, { method: 'POST', body: fd });
+                              const d = await r.json();
+                              setProfileData(prev => ({ ...prev, subject_focus: updated }));
+                              localStorage.setItem(`scholarly_profile_${userId}`, JSON.stringify({ ...profileData, subject_focus: updated }));
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
+                              selected
+                                ? 'bg-violet-600 text-white border-violet-600'
+                                : 'bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-white/[0.07] hover:border-violet-500/50'
+                            }`}
+                          >{s}</button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -1714,70 +1737,6 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* ── Study Tools ── */}
-              {settingsTab === 'study' && (
-                <div className="p-7 space-y-5">
-                  <h2 className="text-lg font-bold text-zinc-900 dark:text-white mb-2">Study Tools</h2>
-
-                  {/* Subject Focus */}
-                  <div>
-                    <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 mb-1">Subject Focus</p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-500 mb-3">Personalises your AI plans and quizzes</p>
-                    <div className="flex flex-wrap gap-2">
-                      {SUBJECTS.map(s => {
-                        const selected = (profileData?.subject_focus || []).includes(s);
-                        return (
-                          <button
-                            key={s}
-                            onClick={async () => {
-                              const current = profileData?.subject_focus || [];
-                              const updated = selected ? current.filter(x => x !== s) : [...current, s];
-                              const fd = new FormData();
-                              fd.append('subject_focus', JSON.stringify(updated));
-                              const r = await apiFetch(`${API_URL}/profile/${userId}`, { method: 'POST', body: fd });
-                              const d = await r.json();
-                              setProfileData(prev => ({ ...prev, subject_focus: updated }));
-                              localStorage.setItem(`scholarly_profile_${userId}`, JSON.stringify({ ...profileData, subject_focus: updated }));
-                            }}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
-                              selected
-                                ? 'bg-violet-600 text-white border-violet-600'
-                                : 'bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-white/[0.07] hover:border-violet-500/50'
-                            }`}
-                          >{s}</button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="border-t border-zinc-100 dark:border-white/6 pt-4 space-y-3">
-                    {[
-                      { icon: AlertTriangle, color: 'text-orange-400', bg: 'rgba(249,115,22,0.12)', label: 'Weakness Tracker', desc: 'Review & fix your wrong answers', action: () => { setShowSettings(false); setShowWeakness(true); }, badge: weaknessCount > 0 ? weaknessCount : null },
-                      { icon: Calendar,      color: 'text-blue-400',   bg: 'rgba(59,130,246,0.12)',  label: 'Daily Planner',   desc: 'AI-generated daily study plan',   action: () => { setShowSettings(false); setShowPlanner(true); } },
-                      { icon: Coffee,        color: 'text-rose-400',   bg: 'rgba(244,63,94,0.12)',  label: 'Pomodoro Timer',  desc: '25-minute focused study sessions', action: () => { setShowPomodoro(p => !p); setShowSettings(false); } },
-                    ].map(({ icon: Icon, color, bg, label, desc, action, badge }) => (
-                      <button
-                        key={label}
-                        onClick={action}
-                        className="w-full flex items-center gap-4 p-4 rounded-2xl transition-all hover:scale-[1.01] text-left bg-zinc-50 dark:bg-white/3 border border-zinc-200 dark:border-white/[0.07] hover:bg-zinc-100 dark:hover:bg-white/6"
-                      >
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: bg }}>
-                          <Icon size={18} className={color} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{label}</p>
-                          <p className="text-xs text-zinc-500 mt-0.5">{desc}</p>
-                        </div>
-                        {badge && (
-                          <span className="w-6 h-6 rounded-full bg-orange-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">{badge}</span>
-                        )}
-                        <ChevronRight size={16} className="text-zinc-700 shrink-0" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* ── Account ── */}
               {settingsTab === 'account' && (
                 <div className="p-7 space-y-4">
@@ -1834,23 +1793,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="py-4 border-b border-zinc-100 dark:border-white/6">
-                    <p className="text-xs text-zinc-400 dark:text-zinc-600 uppercase tracking-widest font-bold mb-3">Danger Zone</p>
-                    <button
-                      onClick={() => {
-                        localStorage.removeItem('scholarly_token');
-                        localStorage.removeItem('scholarly_user_id');
-                        localStorage.removeItem('scholarly_email');
-                        localStorage.removeItem('scholarly_name');
-                        window.location.href = '/login';
-                      }}
-                      className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-red-400 hover:text-red-300 transition-all"
-                      style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}
-                    >
-                      <LogOut size={15} /> Sign out
-                    </button>
                   </div>
-                </div>
               )}
             </div>
           </div>
