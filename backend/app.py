@@ -17,7 +17,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from backend.core.config import ALLOWED_ORIGINS
-from backend.db import init_db
 from backend.routes import auth_routes, profile_routes, chat_routes, quiz_routes, study_routes, knowledge_routes, referral_routes
 
 from sentry_sdk.integrations.fastapi import FastApiIntegration
@@ -35,8 +34,10 @@ if SENTRY_DSN:
 # ── Startup / shutdown ─────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    init_db()
+    # Schema is now owned by Alembic migrations (run via start.sh before
+    # this process starts). init_db() is kept in db.py only as a manual
+    # fallback for a from-scratch local setup — it's intentionally not
+    # called here to avoid two systems both trying to own the schema.
 
     # Start daily notification scheduler (runs every 6 hours)
     import asyncio as _asyncio
