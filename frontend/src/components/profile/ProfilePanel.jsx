@@ -34,7 +34,6 @@ export default function ProfilePanel({ userId, profileData: initialProfileData, 
   const [showPwNew, setShowPwNew]           = useState(false);
   const [pwMsg, setPwMsg]                   = useState(null);
   const [pwSaving, setPwSaving]             = useState(false);
-  const [confirmLogout, setConfirmLogout]   = useState(false);
   const [confirmDelete, setConfirmDelete]   = useState(false);
   const [deleteText, setDeleteText]         = useState('');
   const [deleting, setDeleting]             = useState(false);
@@ -393,21 +392,6 @@ export default function ProfilePanel({ userId, profileData: initialProfileData, 
               <ChevronRight size={14} className="text-zinc-600" />
             </button>
 
-            <button
-              onClick={() => setConfirmLogout(true)}
-              className="w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-all hover:bg-white/[0.05]"
-              style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
-            >
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(96,165,250,0.12)' }}>
-                <LogOut size={16} className="text-blue-400" />
-              </div>
-              <div className="flex-1 text-left">
-                <p className="text-sm font-semibold text-zinc-200">Log Out</p>
-                <p className="text-[11px] text-zinc-500 mt-0.5">Sign out of this device</p>
-              </div>
-              <ChevronRight size={14} className="text-zinc-600" />
-            </button>
-
             <div className="pt-2">
               <p className="text-[9px] font-bold text-red-500/70 uppercase tracking-widest mb-2 px-1">Danger Zone</p>
               <button
@@ -465,27 +449,6 @@ export default function ProfilePanel({ userId, profileData: initialProfileData, 
                 </button>
                 <button onClick={() => { setShowPwModal(false); setPwCurrent(''); setPwNew(''); setPwMsg(null); }}
                   className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 text-xs font-bold transition-all">
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Logout confirmation */}
-        {confirmLogout && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setConfirmLogout(false)}>
-            <div className="bg-[#16161a] border border-white/10 rounded-2xl p-6 w-[300px] text-center space-y-3" onClick={e => e.stopPropagation()}>
-              <LogOut size={28} className="text-blue-400 mx-auto" />
-              <p className="text-sm font-bold text-white">Log out of Clarix?</p>
-              <p className="text-xs text-zinc-500">You'll need to sign in again to continue.</p>
-              <div className="flex gap-2 pt-1">
-                <button onClick={() => { setConfirmLogout(false); onLogout && onLogout(); }}
-                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all">
-                  Log Out
-                </button>
-                <button onClick={() => setConfirmLogout(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 text-xs font-bold transition-all">
                   Cancel
                 </button>
               </div>

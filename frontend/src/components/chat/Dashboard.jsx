@@ -104,6 +104,7 @@ export default function Dashboard() {
   const [showWeakness, setShowWeakness]     = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSettings, setShowSettings]           = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
   const [showProfileMenu, setShowProfileMenu]     = useState(false);
   const [settingsTab, setSettingsTab]             = useState('general');
   const [unreadCount, setUnreadCount]       = useState(0);
@@ -954,13 +955,7 @@ export default function Dashboard() {
 
                     {/* Log out */}
                     <button
-                      onClick={() => {
-                        localStorage.removeItem('scholarly_token');
-                        localStorage.removeItem('scholarly_user_id');
-                        localStorage.removeItem('scholarly_email');
-                        localStorage.removeItem('scholarly_name');
-                        window.location.href = '/login';
-                      }}
+                      onClick={() => { setShowProfileMenu(false); setConfirmLogout(true); }}
                       className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-zinc-100 dark:hover:bg-white/5 transition-all"
                     >
                       <LogOut size={16} className="text-red-400 shrink-0" />
@@ -1556,10 +1551,12 @@ export default function Dashboard() {
                       <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-0.5">Focus timer with 25/5 min cycles</p>
                     </div>
                     <button
+                      role="switch"
+                      aria-checked={showPomodoro}
                       onClick={() => { setShowPomodoro(p => !p); setShowSettings(false); }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${showPomodoro ? 'bg-rose-600/80 text-white' : 'bg-zinc-100 dark:bg-white/[0.07] text-zinc-500 dark:text-zinc-400'}`}
+                      className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${showPomodoro ? 'bg-violet-600' : 'bg-zinc-300 dark:bg-white/10'}`}
                     >
-                      {showPomodoro ? 'On' : 'Off'}
+                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${showPomodoro ? 'translate-x-5' : ''}`} />
                     </button>
                   </div>
                   {/* Chat mode */}
@@ -1751,6 +1748,19 @@ export default function Dashboard() {
                     </div>
                     <button onClick={() => { setShowSettings(false); setShowProfile(true); }} className="px-3 py-1.5 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-all bg-zinc-100 dark:bg-white/[0.07]">Edit Profile</button>
                   </div>
+
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-white pt-2">Security</h3>
+                  <button
+                    onClick={() => { setShowSettings(false); setConfirmLogout(true); }}
+                    className="w-full flex items-center justify-between py-3 border-b border-zinc-100 dark:border-white/6 text-left"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Log out</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">Sign out of this device</p>
+                    </div>
+                    <ChevronRight size={16} className="text-zinc-500 shrink-0" />
+                  </button>
+
                   {/* Change Password */}
                   <div className="py-4 border-b border-zinc-100 dark:border-white/6">
                     <p className="text-xs text-zinc-400 dark:text-zinc-600 uppercase tracking-widest font-bold mb-3">Change Password</p>
@@ -1793,8 +1803,81 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  {/* Session */}
+                  <div className="pt-2">
+                    <p className="text-xs text-zinc-400 dark:text-zinc-600 uppercase tracking-widest font-bold mb-3">Session</p>
+                    <button
+                      onClick={() => { setShowSettings(false); setConfirmLogout(true); }}
+                      className="w-full flex items-center justify-between py-3 border-b border-zinc-100 dark:border-white/6 text-left"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Log out</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">Sign out of Clarix on this device</p>
+                      </div>
+                      <ChevronRight size={16} className="text-zinc-400 dark:text-zinc-600 shrink-0" />
+                    </button>
+                  </div>
+
                   </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmLogout && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setConfirmLogout(false)}>
+          <div className="bg-[#16161a] border border-white/10 rounded-2xl p-6 w-[300px] text-center space-y-3" onClick={e => e.stopPropagation()}>
+            <LogOut size={28} className="text-blue-400 mx-auto" />
+            <p className="text-sm font-bold text-white">Log out of Clarix?</p>
+            <p className="text-xs text-zinc-500">You'll need to sign in again to continue.</p>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => {
+                  setConfirmLogout(false);
+                  localStorage.removeItem('scholarly_token');
+                  localStorage.removeItem('scholarly_user_id');
+                  localStorage.removeItem('scholarly_email');
+                  localStorage.removeItem('scholarly_name');
+                  window.location.href = '/login';
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all"
+              >
+                Log Out
+              </button>
+              <button onClick={() => setConfirmLogout(false)}
+                className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 text-xs font-bold transition-all">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmLogout && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setConfirmLogout(false)}>
+          <div className="bg-[#16161a] border border-white/10 rounded-2xl p-6 w-[300px] text-center space-y-3" onClick={e => e.stopPropagation()}>
+            <LogOut size={28} className="text-blue-400 mx-auto" />
+            <p className="text-sm font-bold text-white">Log out of Clarix?</p>
+            <p className="text-xs text-zinc-500">You'll need to sign in again to continue.</p>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => {
+                  setConfirmLogout(false);
+                  localStorage.removeItem('scholarly_token');
+                  localStorage.removeItem('scholarly_user_id');
+                  localStorage.removeItem('scholarly_email');
+                  localStorage.removeItem('scholarly_name');
+                  window.location.href = '/login';
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all"
+              >
+                Log Out
+              </button>
+              <button onClick={() => setConfirmLogout(false)}
+                className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 text-xs font-bold transition-all">
+                Cancel
+              </button>
             </div>
           </div>
         </div>
