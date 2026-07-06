@@ -39,6 +39,9 @@ async def lifespan(app: FastAPI):
     # fallback for a from-scratch local setup — it's intentionally not
     # called here to avoid two systems both trying to own the schema.
 
+    from backend.core.config import DB_HOST, DB_NAME
+    print(f"🔌 Connected to Postgres: {DB_HOST}/{DB_NAME}")
+
     # Start daily notification scheduler (runs every 6 hours)
     import asyncio as _asyncio
 
