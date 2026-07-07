@@ -70,6 +70,19 @@ def get_connection():
     if conn.closed:
         connection_pool.putconn(conn)
         raise RuntimeError("Retrieved a closed connection from pool.")
+
+    # Defensive: if a previous caller returned this connection to the pool
+    # while it was still inside a failed transaction (e.g. a missing
+    # rollback on an exception path), Postgres will refuse to run any new
+    # command on it until it's rolled back. Clear that state here so a
+    # single bad prior transaction can't poison every future borrower.
+    if conn.status != extensions.STATUS_READY:
+        try:
+            conn.rollback()
+        except Exception:
+            connection_pool.putconn(conn, close=True)
+            raise RuntimeError("Connection was in a bad state and could not be recovered.")
+
     return conn
 
 
@@ -78,14 +91,12 @@ def release_connection(conn) -> None:
     if connection_pool is not None and conn is not None:
         connection_pool.putconn(conn)
 
+
 def init_db():
     """Initialize database tables"""
-    if connection_pool is None:
-        print("⚠️ Cannot initialize database: connection pool is not available")
-        return
-
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
 
         cursor.execute("""
@@ -307,16 +318,19 @@ def init_db():
         conn.commit()
         print("✅ Database tables and indexes initialized successfully")
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         print(f"⚠️ Error initializing database: {e}")
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 
 def upsert_streak(user_id: str, streak: dict) -> None:
     """Write streak data to PostgreSQL. Called after every streak mutation."""
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO user_streaks
@@ -341,16 +355,19 @@ def upsert_streak(user_id: str, streak: dict) -> None:
         ))
         conn.commit()
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         print(f"⚠️ Failed to upsert streak for {user_id}: {e}")
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 
 def load_streak_from_db(user_id: str) -> dict | None:
     """Load streak from PostgreSQL. Returns None if not found."""
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT current, longest, last_active, freeze_used, freeze_week, recovered_today
@@ -371,13 +388,15 @@ def load_streak_from_db(user_id: str) -> dict | None:
         print(f"⚠️ Failed to load streak for {user_id}: {e}")
         return None
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 # ── XP ─────────────────────────────────────────────────────────────────────────
 
 def upsert_xp(user_id: str, xp: dict) -> None:
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO user_xp (user_id, total, level, updated_at)
@@ -389,15 +408,18 @@ def upsert_xp(user_id: str, xp: dict) -> None:
         """, (user_id, xp.get("total", 0), xp.get("level", 1)))
         conn.commit()
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         print(f"⚠️ Failed to upsert XP for {user_id}: {e}")
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 
 def load_xp_from_db(user_id: str) -> dict | None:
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT total, level FROM user_xp WHERE user_id = %s", (user_id,))
         row = cursor.fetchone()
@@ -406,15 +428,17 @@ def load_xp_from_db(user_id: str) -> dict | None:
         print(f"⚠️ Failed to load XP for {user_id}: {e}")
         return None
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 
 # ── Weaknesses ─────────────────────────────────────────────────────────────────
 
 def upsert_weaknesses(user_id: str, weaknesses: list) -> None:
     import json as _json
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO user_weaknesses (user_id, data, updated_at)
@@ -425,16 +449,19 @@ def upsert_weaknesses(user_id: str, weaknesses: list) -> None:
         """, (user_id, _json.dumps(weaknesses)))
         conn.commit()
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         print(f"⚠️ Failed to upsert weaknesses for {user_id}: {e}")
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 
 def load_weaknesses_from_db(user_id: str) -> list | None:
     import json as _json
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT data FROM user_weaknesses WHERE user_id = %s", (user_id,))
         row = cursor.fetchone()
@@ -444,15 +471,17 @@ def load_weaknesses_from_db(user_id: str) -> list | None:
         print(f"⚠️ Failed to load weaknesses for {user_id}: {e}")
         return None
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 
 # ── Planner ────────────────────────────────────────────────────────────────────
 
 def upsert_planner(user_id: str, tasks: list) -> None:
     import json as _json
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO user_planners (user_id, data, updated_at)
@@ -463,16 +492,19 @@ def upsert_planner(user_id: str, tasks: list) -> None:
         """, (user_id, _json.dumps(tasks)))
         conn.commit()
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         print(f"⚠️ Failed to upsert planner for {user_id}: {e}")
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 
 def load_planner_from_db(user_id: str) -> list | None:
     import json as _json
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT data FROM user_planners WHERE user_id = %s", (user_id,))
         row = cursor.fetchone()
@@ -482,15 +514,17 @@ def load_planner_from_db(user_id: str) -> list | None:
         print(f"⚠️ Failed to load planner for {user_id}: {e}")
         return None
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 
 # ── Notifications ──────────────────────────────────────────────────────────────
 
 def upsert_notifications(user_id: str, notifications: list) -> None:
     import json as _json
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO user_notifications (user_id, data, updated_at)
@@ -501,14 +535,18 @@ def upsert_notifications(user_id: str, notifications: list) -> None:
         """, (user_id, _json.dumps(notifications)))
         conn.commit()
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         print(f"⚠️ Failed to upsert notifications for {user_id}: {e}")
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
+
 
 def record_progress(user_id: str, weaknesses_cleared: int = 0, quizzes_passed: int = 0, xp_earned: int = 0, study_minutes: int = 0):
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO user_progress (user_id, date, weaknesses_cleared, quizzes_passed, xp_earned, study_minutes)
@@ -521,14 +559,18 @@ def record_progress(user_id: str, weaknesses_cleared: int = 0, quizzes_passed: i
         """, (user_id, weaknesses_cleared, quizzes_passed, xp_earned, study_minutes))
         conn.commit()
     except Exception as e:
+        if conn:
+            conn.rollback()
         print(f"⚠️ record_progress error: {e}")
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 
 def get_weekly_progress(user_id: str) -> list:
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cur = conn.cursor()
         cur.execute("""
             SELECT date, weaknesses_cleared, quizzes_passed, xp_earned, study_minutes
@@ -542,13 +584,15 @@ def get_weekly_progress(user_id: str) -> list:
         print(f"⚠️ get_weekly_progress error: {e}")
         return []
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
 
 
 def load_notifications_from_db(user_id: str) -> list | None:
     import json as _json
-    conn = get_connection()
+    conn = None
     try:
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT data FROM user_notifications WHERE user_id = %s", (user_id,))
         row = cursor.fetchone()
@@ -558,7 +602,9 @@ def load_notifications_from_db(user_id: str) -> list | None:
         print(f"⚠️ Failed to load notifications for {user_id}: {e}")
         return None
     finally:
-        release_connection(conn)
+        if conn:
+            release_connection(conn)
+
 
 async def run_query(fn, *args, **kwargs):
     """
