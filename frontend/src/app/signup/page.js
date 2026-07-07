@@ -2,8 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { useAuth } from "../../context/AuthContext";
 
 // Extract referral code from URL
 const getReferralCode = () => {
@@ -13,6 +12,7 @@ const getReferralCode = () => {
 
 export default function SignupPage() {
   const router = useRouter();
+  const { signup } = useAuth();
   const [name, setName]         = useState("");
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
@@ -27,19 +27,11 @@ export default function SignupPage() {
     if (password !== confirm) { setError("Passwords do not match."); return; }
     if (password.length < 8)  { setError("Password must be at least 8 characters."); return; }
     setLoading(true);
-    const fd = new FormData();
-    fd.append("name", name);
-    fd.append("email", email);
-    fd.append("password", password);
     try {
-      const refCode = getReferralCode();
-      const url = refCode ? `${API_URL}/auth/register?ref=${refCode}` : `${API_URL}/auth/register`;
-      const r = await fetch(url, { method: "POST", body: fd });
-      const d = await r.json();
-      if (!r.ok) { setError(d.detail || "Registration failed."); return; }
+      await signup(email, name, password, getReferralCode());
       setSuccess(true);
-    } catch {
-      setError("Request failed. Please try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Registration failed.");
     } finally {
       setLoading(false);
     }
@@ -65,12 +57,12 @@ export default function SignupPage() {
         <div style={{ width: "100%", maxWidth: "420px" }}>
           {success ? (
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>📬</div>
-              <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: "1.6rem", fontWeight: 800, letterSpacing: "-0.03em", margin: "0 0 0.75rem" }}>Check your inbox.</h2>
+              <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🎉</div>
+              <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: "1.6rem", fontWeight: 800, letterSpacing: "-0.03em", margin: "0 0 0.75rem" }}>You're in.</h2>
               <p style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.4)", lineHeight: 1.7, margin: "0 0 2rem" }}>
-                We've sent a verification email to <strong style={{ color: "#e8e8f0" }}>{email}</strong>. Click the link to activate your account.
+                We've also sent a verification email to <strong style={{ color: "#e8e8f0" }}>{email}</strong> — no rush, you're already signed in.
               </p>
-              <button onClick={() => router.push("/login")} style={btnStyle}>Go to sign in →</button>
+              <button onClick={() => router.push("/")} style={btnStyle}>Go to dashboard →</button>
             </div>
           ) : (
             <>

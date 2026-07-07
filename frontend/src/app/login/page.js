@@ -2,11 +2,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "../../context/AuthContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [error, setError]       = useState(null);
@@ -20,24 +22,13 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const fd = new FormData();
-    fd.append("email", email);
-    fd.append("password", password);
     try {
-      const r = await fetch(`${API_URL}/auth/login`, { method: "POST", body: fd });
-      const d = await r.json();
-      if (!r.ok) {
-        setError(d.detail || "Login failed.");
-        if (d.detail?.toLowerCase().includes("verify")) setForgotEmail(email);
-        return;
-      }
-      localStorage.setItem("scholarly_token", d.token);
-      localStorage.setItem("scholarly_user_id", d.user_id);
-      localStorage.setItem("scholarly_email", email);
-      localStorage.setItem("scholarly_name", d.name || "");
+      await login(email, password);
       router.push("/");
-    } catch {
-      setError("Request failed. Please try again.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Login failed.";
+      setError(msg);
+      if (msg.toLowerCase().includes("verify")) setForgotEmail(email);
     } finally {
       setLoading(false);
     }

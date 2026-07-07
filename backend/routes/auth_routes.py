@@ -1,6 +1,6 @@
 import asyncio
 import os
-from fastapi import APIRouter, Depends, HTTPException, Form, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Form, Request
 import json
 from datetime import date
 from backend.auth import User, authenticate_user, get_email_from_user_id, get_user_by_email, get_user_id_from_email
@@ -55,7 +55,6 @@ def _record_attempt(email: str, ip: str, success: bool):
 @limiter.limit("10/minute")
 async def login(
     request:  Request,
-    response: Response,
     email:    str = Form(...),
     password: str = Form(...),
 ):
@@ -111,15 +110,6 @@ async def login(
         "bio":           user.bio,
         "subject_focus": user.subject_focus,
     }
-    from backend.core.config import ENVIRONMENT
-    response.set_cookie(
-        key="scholarly_token",
-        value=token,
-        httponly=True,
-        secure=os.getenv("ENVIRONMENT", "development") != "development",
-        samesite="lax",
-        max_age=60 * 60 * 24 * 7
-    )
     return data
 
 
@@ -127,7 +117,6 @@ async def login(
 @limiter.limit("5/minute")
 async def register(
     request: Request,
-    response: Response,
     email:    str = Form(...),
     password: str = Form(...),
     name:     str = Form(...),
@@ -155,15 +144,6 @@ async def register(
         "bio":           "",
         "subject_focus": [],
     }
-    from backend.core.config import ENVIRONMENT
-    response.set_cookie(
-        key="scholarly_token",
-        value=token,
-        httponly=True,
-        secure=os.getenv("ENVIRONMENT", "development") != "development",
-        samesite="lax",
-        max_age=60 * 60 * 24 * 7
-    )
     return data
 
 
@@ -196,20 +176,10 @@ async def check_auth(
 
 @router.post("/auth/refresh")
 async def refresh_token(
-    response: Response,
     current_user: dict = Depends(get_current_user)
 ):
-    """Issue a fresh token and rotate — old token is implicitly invalidated."""
+    """Issue a fresh token — rotate on the client; old token remains valid until its own expiry (stateless JWT, no server-side revocation)."""
     new_token = create_token(current_user["user_id"], current_user["email"])
-    from backend.core.config import ENVIRONMENT
-    response.set_cookie(
-        key="scholarly_token",
-        value=new_token,
-        httponly=True,
-        secure=os.getenv("ENVIRONMENT", "development") != "development",
-        samesite="lax",
-        max_age=60 * 60 * 24 * 7
-    )
     return {"token": new_token}
 
 @router.get("/auth/verify-email")

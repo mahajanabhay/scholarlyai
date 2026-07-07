@@ -46,7 +46,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, name: string, password: string) => Promise<void>;
+  signup: (email: string, name: string, password: string, referralCode?: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -159,13 +159,18 @@ useEffect(() => {
     email: string,
     name: string,
     password: string,
+    referralCode?: string,
   ): Promise<void> => {
     const fd = new FormData();
     fd.append('email', email);
     fd.append('name', name);
     fd.append('password', password);
 
-    const res = await fetch(`${API_URL}/auth/register`, {
+    const url = referralCode
+      ? `${API_URL}/auth/register?ref=${encodeURIComponent(referralCode)}`
+      : `${API_URL}/auth/register`;
+
+    const res = await fetch(url, {
       method: 'POST',
       credentials: "include",
       body: fd,
