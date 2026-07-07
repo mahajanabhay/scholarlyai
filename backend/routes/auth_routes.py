@@ -71,13 +71,6 @@ async def login(
         audit(None, "login_failed", f"email={email}", ip)
         raise HTTPException(status_code=401, detail=message)
 
-    # Redeem referral code if provided
-    ref_code = request.query_params.get("ref") or request.headers.get("X-Referral-Code")
-    if ref_code:
-        new_uid = get_user_id_from_email(email)
-        if new_uid:
-            from backend.routes.referral_routes import redeem_referral
-            redeem_referral(ref_code, new_uid)
     user_id = get_user_id_from_email(email)
 
     audit(user_id, "login_success", f"email={email}", ip)
